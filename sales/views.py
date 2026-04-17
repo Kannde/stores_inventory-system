@@ -40,6 +40,7 @@ def new_sale(request, store_slug):
             'id': str(p.id), 'name': p.name, 'sku': p.sku,
             'unit_price': str(p.unit_price), 'stock_qty': p.stock_qty,
             'unit_label': p.unit_label,
+            'barcode': p.barcode,
             'image_url': first_img.image.url if first_img else None,
         })
 

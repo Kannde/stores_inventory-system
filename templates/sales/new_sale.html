@@ -67,9 +67,34 @@
 <div class="container" style="padding-bottom:200px">
 
   <!-- Search -->
-  <div class="search-bar" style="margin-bottom:14px">
+  <div class="search-bar" style="margin-bottom:8px">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
     <input type="search" id="searchInput" placeholder="Search products..." autocomplete="off" style="padding-left:40px">
+  </div>
+
+  <!-- Barcode scanner bar -->
+  <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">
+    <div style="position:relative;flex:1">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:var(--text-3)"><path d="M3 9V6a2 2 0 012-2h2M15 4h2a2 2 0 012 2v3M21 15v3a2 2 0 01-2 2h-2M9 20H6a2 2 0 01-2-2v-3"/><line x1="7" y1="12" x2="7" y2="12.01"/><line x1="12" y1="9" x2="12" y2="15"/><line x1="9" y1="12" x2="9" y2="12.01"/><line x1="15" y1="9" x2="15" y2="15"/><line x1="17" y1="12" x2="17" y2="12.01"/></svg>
+      <input type="text" id="barcodeInput" placeholder="Scan barcode or type & press Enter..."
+        autocomplete="off" inputmode="none"
+        style="width:100%;padding:10px 14px 10px 36px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:var(--font);background:var(--surface);color:var(--text)"
+        onkeydown="handleBarcodeKey(event)">
+    </div>
+    <button type="button" id="cameraScanBtn" onclick="toggleCamera()"
+      style="width:44px;height:44px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0" title="Scan with camera">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    </button>
+  </div>
+
+  <!-- Camera view (hidden until activated) -->
+  <div id="cameraSection" style="display:none;margin-bottom:14px;border-radius:var(--radius);overflow:hidden;position:relative;background:#000">
+    <video id="cameraVideo" style="width:100%;max-height:220px;object-fit:cover;display:block" playsinline muted></video>
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
+      <div style="width:60%;height:40%;border:2px solid rgba(255,255,255,.7);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.4)"></div>
+    </div>
+    <button type="button" onclick="toggleCamera()" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer">Close</button>
+    <div id="cameraStatus" style="position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,.8)">Point camera at barcode</div>
   </div>
 
   <!-- Products -->
@@ -465,6 +490,154 @@ document.querySelectorAll('.modal-overlay').forEach(el => {
 const style = document.createElement('style');
 style.textContent = '.pay-method.active{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}';
 document.head.appendChild(style);
+
+// ── Barcode Scanner ───────────────────────────────────────────
+let scannerActive = false;
+let cameraStream = null;
+let zxingReader = null;
+
+function handleBarcodeKey(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const code = document.getElementById('barcodeInput').value.trim();
+    if (code) { lookupBarcode(code); }
+    document.getElementById('barcodeInput').value = '';
+  }
+}
+
+function lookupBarcode(code) {
+  const product = ALL_PRODUCTS.find(p => p.barcode === code);
+  if (product) {
+    addProduct(product);
+    flashBarcodeInput('success');
+    document.getElementById('barcodeInput').focus();
+  } else {
+    flashBarcodeInput('error');
+    showScanToast('Barcode not found: ' + code, true);
+  }
+}
+
+function flashBarcodeInput(type) {
+  const input = document.getElementById('barcodeInput');
+  const isOk = type === 'success';
+  input.style.borderColor = isOk ? 'var(--accent)' : 'var(--danger)';
+  input.style.background = isOk ? 'var(--accent-light)' : 'var(--danger-light)';
+  setTimeout(() => { input.style.borderColor = ''; input.style.background = ''; }, 700);
+}
+
+let scanToastTimer = null;
+function showScanToast(msg, isError) {
+  let toast = document.getElementById('scanFeedbackToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'scanFeedbackToast';
+    toast.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);padding:10px 22px;border-radius:24px;font-size:13px;font-weight:600;z-index:300;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.25);transition:opacity .3s';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.background = isError ? 'var(--danger)' : 'var(--accent-dark)';
+  toast.style.color = '#fff';
+  toast.style.opacity = '1';
+  toast.style.display = 'block';
+  clearTimeout(scanToastTimer);
+  scanToastTimer = setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => { toast.style.display = 'none'; }, 300); }, 2000);
+}
+
+async function toggleCamera() {
+  if (scannerActive) { stopCamera(); return; }
+  const btn = document.getElementById('cameraScanBtn');
+  btn.style.background = 'var(--accent-light)';
+  btn.style.borderColor = 'var(--accent)';
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }
+    });
+    const video = document.getElementById('cameraVideo');
+    video.srcObject = cameraStream;
+    await video.play();
+    document.getElementById('cameraSection').style.display = 'block';
+    scannerActive = true;
+    startBarcodeDetection();
+  } catch (err) {
+    btn.style.background = '';
+    btn.style.borderColor = '';
+    showScanToast('Camera not available — use manual input', true);
+  }
+}
+
+function stopCamera() {
+  scannerActive = false;
+  if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+  if (zxingReader) { try { zxingReader.reset(); } catch {} zxingReader = null; }
+  const video = document.getElementById('cameraVideo');
+  video.srcObject = null;
+  document.getElementById('cameraSection').style.display = 'none';
+  const btn = document.getElementById('cameraScanBtn');
+  btn.style.background = '';
+  btn.style.borderColor = '';
+}
+
+function startBarcodeDetection() {
+  if ('BarcodeDetector' in window) {
+    const detector = new BarcodeDetector({ formats: ['code_128', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_39', 'itf', 'qr_code'] });
+    const video = document.getElementById('cameraVideo');
+    let lastCode = '', lastTime = 0;
+    (async function detect() {
+      if (!scannerActive) return;
+      try {
+        const found = await detector.detect(video);
+        if (found.length) {
+          const code = found[0].rawValue;
+          const now = Date.now();
+          if (code !== lastCode || now - lastTime > 2000) {
+            lastCode = code; lastTime = now;
+            lookupBarcode(code);
+            flashCameraSection();
+          }
+        }
+      } catch {}
+      if (scannerActive) requestAnimationFrame(detect);
+    })();
+  } else {
+    loadZxing();
+  }
+}
+
+function flashCameraSection() {
+  const sec = document.getElementById('cameraSection');
+  sec.style.outline = '3px solid var(--accent)';
+  setTimeout(() => { sec.style.outline = ''; }, 600);
+}
+
+function loadZxing() {
+  if (window.ZXing) { startZxing(); return; }
+  document.getElementById('cameraStatus').textContent = 'Loading scanner...';
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.19.3/umd/index.min.js';
+  s.onload = startZxing;
+  s.onerror = () => { document.getElementById('cameraStatus').textContent = 'Scanner unavailable — use manual input'; };
+  document.head.appendChild(s);
+}
+
+function startZxing() {
+  document.getElementById('cameraStatus').textContent = 'Point camera at barcode';
+  const video = document.getElementById('cameraVideo');
+  zxingReader = new ZXing.BrowserMultiFormatReader();
+  let lastCode = '', lastTime = 0;
+  zxingReader.decodeFromVideoElement(video, (result, err) => {
+    if (!scannerActive || !result) return;
+    const code = result.getText();
+    const now = Date.now();
+    if (code !== lastCode || now - lastTime > 2000) {
+      lastCode = code; lastTime = now;
+      lookupBarcode(code);
+      flashCameraSection();
+    }
+  });
+}
+
+// Auto-focus barcode input so physical scanners work immediately
+document.getElementById('barcodeInput').focus();
 
 // Initial render
 renderCatalog('');
