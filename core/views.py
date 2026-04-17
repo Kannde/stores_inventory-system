@@ -18,7 +18,7 @@ from .access import (
     is_store_owner,
 )
 from .forms import AdminStoreForm, LoginForm, OwnerForm, StaffForm, StoreSettingsForm
-from .models import Store, StoreStaff
+from .models import Store, StoreSettings, StoreStaff
 
 User = get_user_model()
 
@@ -305,14 +305,27 @@ def store_settings(request, store_slug):
     if not is_store_owner(request.user, store):
         raise PermissionDenied
 
+    settings_obj, _ = StoreSettings.objects.get_or_create(store=store)
+
     form = StoreSettingsForm(request.POST or None, request.FILES or None, instance=store)
     if request.method == 'POST' and form.is_valid():
         form.save()
-        messages.success(request, 'Store details updated.')
+        settings_obj.allow_partial_payment = request.POST.get('allow_partial_payment') == 'on'
+        settings_obj.allow_credit = request.POST.get('allow_credit') == 'on'
+        settings_obj.min_deposit_percent = request.POST.get('min_deposit_percent') or 30
+        settings_obj.preorder_enabled = request.POST.get('preorder_enabled') == 'on'
+        settings_obj.preorder_payment_policy = request.POST.get('preorder_payment_policy', 'on_delivery')
+        settings_obj.preorder_deposit_percent = request.POST.get('preorder_deposit_percent') or 30
+        settings_obj.preorder_expected_days = request.POST.get('preorder_expected_days') or 7
+        settings_obj.preorder_welcome_message = request.POST.get('preorder_welcome_message', '')
+        settings_obj.preorder_whatsapp_number = request.POST.get('preorder_whatsapp_number', '')
+        settings_obj.save()
+        messages.success(request, 'Store settings updated.')
         return redirect('core:store_settings', store_slug=store.slug)
 
     return render(request, 'core/store_form.html', {
         'store': store,
         'form': form,
+        'store_settings': settings_obj,
         **build_store_permissions(request.user, store),
     })

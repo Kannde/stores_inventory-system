@@ -2,6 +2,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from core.views import get_store
+from core.models import StoreSettings
 from .models import PreOrder, PreOrderItem
 
 
@@ -28,7 +29,10 @@ def preorder_form(request, store_slug):
                     unit_label=unit or 'unit',
                 )
         return redirect('preorders:preorder_success', store_slug=store.slug)
-    return render(request, 'preorders/preorder_form.html', {'store': store})
+    store_settings, _ = StoreSettings.objects.get_or_create(store=store)
+    if not store_settings.preorder_enabled:
+        return render(request, 'preorders/preorder_disabled.html', {'store': store})
+    return render(request, 'preorders/preorder_form.html', {'store': store, 'store_settings': store_settings})
 
 
 def preorder_success(request, store_slug):
@@ -43,8 +47,10 @@ def preorder_list(request, store_slug):
     preorders = PreOrder.objects.filter(store=store)
     if status != 'all':
         preorders = preorders.filter(status=status)
+    store_settings, _ = StoreSettings.objects.get_or_create(store=store)
     return render(request, 'preorders/preorder_list.html', {
         'store': store, 'preorders': preorders, 'current_status': status,
+        'store_settings': store_settings,
     })
 
 

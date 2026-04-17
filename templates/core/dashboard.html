@@ -75,7 +75,8 @@
       <a href="{% url 'inventory:product_add' store.slug %}" class="btn btn-outline btn-block">Add Product</a>
       <a href="{% url 'inventory:package_add' store.slug %}" class="btn btn-outline btn-block">New Package</a>
       <a href="{% url 'preorders:preorder_list' store.slug %}" class="btn btn-outline btn-block">Pre-orders</a>
-      <a href="{% url 'inventory:supplier_list' store.slug %}" class="btn btn-outline btn-block" style="grid-column:span 2">Suppliers</a>
+      <a href="{% url 'sales:credit_list' store.slug %}" class="btn btn-outline btn-block">Credit Accounts</a>
+      <a href="{% url 'inventory:supplier_list' store.slug %}" class="btn btn-outline btn-block">Suppliers</a>
     </div>
   </div>
 

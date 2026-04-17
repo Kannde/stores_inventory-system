@@ -8,6 +8,37 @@
 {% endblock %}
 {% block content %}
 <div class="container">
+
+  {% if expired %}
+  <div class="card" style="border-left:3px solid var(--danger)">
+    <div class="card-title" style="color:var(--danger);margin-bottom:8px">Expired ({{ expired.count }})</div>
+    {% for p in expired %}
+    <a href="{% url 'inventory:product_edit' store.slug p.pk %}" class="list-item" style="text-decoration:none;color:inherit;margin:0 -16px;padding:8px 16px">
+      <div class="list-content">
+        <div class="list-title">{{ p.name }}</div>
+        <div class="list-sub">Expired {{ p.expiry_date|date:"d M Y" }}</div>
+      </div>
+      <div class="badge badge-danger">Expired</div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if expiring_soon %}
+  <div class="card" style="border-left:3px solid var(--warning)">
+    <div class="card-title" style="color:var(--warning);margin-bottom:8px">Expiring Soon ({{ expiring_soon.count }})</div>
+    {% for p in expiring_soon %}
+    <a href="{% url 'inventory:product_edit' store.slug p.pk %}" class="list-item" style="text-decoration:none;color:inherit;margin:0 -16px;padding:8px 16px">
+      <div class="list-content">
+        <div class="list-title">{{ p.name }}</div>
+        <div class="list-sub">Expires {{ p.expiry_date|date:"d M Y" }} · {{ p.days_until_expiry }} days left</div>
+      </div>
+      <div class="badge badge-warning">{{ p.days_until_expiry }}d</div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   {% if out_of_stock %}
   <div class="card" style="border-left:3px solid var(--danger)">
     <div class="card-title" style="color:var(--danger);margin-bottom:8px">Out of Stock ({{ out_of_stock.count }})</div>
@@ -38,12 +69,12 @@
   {% endif %}
 
   <div class="card">
-    <div class="card-title" style="margin-bottom:8px">All Products</div>
+    <div class="card-title" style="margin-bottom:8px">All Products ({{ products.count }})</div>
     {% for p in products %}
     <a href="{% url 'inventory:stock_adjust' store.slug p.pk %}" class="list-item" style="text-decoration:none;color:inherit;margin:0 -16px;padding:8px 16px">
       <div class="list-content">
         <div class="list-title">{{ p.name }}</div>
-        <div class="list-sub">{{ p.unit_label }}</div>
+        <div class="list-sub">{{ p.unit_label }}{% if p.expiry_date %} · Exp {{ p.expiry_date|date:"d M Y" }}{% endif %}</div>
       </div>
       <div style="font-weight:600;font-size:14px;{% if p.is_out_of_stock %}color:var(--danger){% elif p.is_low_stock %}color:var(--warning){% else %}color:var(--accent){% endif %}">
         {{ p.stock_qty }}

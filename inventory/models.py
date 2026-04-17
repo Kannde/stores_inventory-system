@@ -1,4 +1,5 @@
 import uuid
+import random
 from django.db import models
 from django.db.models import Sum, F
 from core.models import Store
@@ -9,6 +10,7 @@ class Category(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='categories')
     name = models.CharField(max_length=100)
     sort_order = models.IntegerField(default=0)
+    expiry_warning_days = models.PositiveIntegerField(default=30, help_text='Days before expiry to show warning')
 
     class Meta:
         ordering = ['sort_order', 'name']
@@ -112,6 +114,8 @@ class Product(models.Model):
     unit_label = models.CharField(max_length=30, default='unit', help_text='e.g. piece, kg, bag, bottle')
     stock_qty = models.IntegerField(default=0)
     reorder_level = models.IntegerField(default=5)
+    expiry_date = models.DateField(null=True, blank=True)
+    barcode = models.CharField(max_length=50, blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -122,6 +126,17 @@ class Product(models.Model):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        if not self.barcode:
+            self.barcode = self._generate_barcode()
+        super().save(*args, **kwargs)
+
+    def _generate_barcode(self):
+        while True:
+            code = str(random.randint(100000000000, 999999999999))
+            if not Product.objects.filter(store=self.store, barcode=code).exists():
+                return code
+
     @property
     def is_low_stock(self):
         return self.stock_qty <= self.reorder_level
@@ -129,6 +144,13 @@ class Product(models.Model):
     @property
     def is_out_of_stock(self):
         return self.stock_qty <= 0
+
+    @property
+    def days_until_expiry(self):
+        if not self.expiry_date:
+            return None
+        from django.utils import timezone
+        return (self.expiry_date - timezone.now().date()).days
 
 
 class ProductImage(models.Model):

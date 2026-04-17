@@ -76,7 +76,23 @@
           <input type="number" name="reorder_level" class="form-input" value="{{ product.reorder_level|default:'5' }}">
         </div>
       </div>
+      <div class="form-group">
+        <label class="form-label">Expiry Date</label>
+        <input type="date" name="expiry_date" class="form-input" value="{{ product.expiry_date|date:'Y-m-d'|default:'' }}">
+        <div style="font-size:11px;color:var(--text-3);margin-top:3px">Leave blank if product has no expiry</div>
+      </div>
     </div>
+
+    {% if product and product.barcode %}
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px">Barcode</div>
+      <div style="text-align:center;padding:8px 0">
+        <svg id="barcode"></svg>
+        <div style="font-size:12px;color:var(--text-3);margin-top:6px">{{ product.barcode }}</div>
+      </div>
+      <a href="{% url 'inventory:barcode_print' store.slug product.pk %}" class="btn btn-outline btn-block" style="margin-top:8px" target="_blank">Print Barcode</a>
+    </div>
+    {% endif %}
 
     <div class="card">
       <div class="card-title" style="margin-bottom:12px">Images</div>
@@ -95,4 +111,14 @@
     </button>
   </form>
 </div>
+{% endblock %}
+{% block scripts %}
+{% if product and product.barcode %}
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script>
+JsBarcode("#barcode", "{{ product.barcode }}", {
+  format: "CODE128", lineColor: "#000", width: 2, height: 60, displayValue: false
+});
+</script>
+{% endif %}
 {% endblock %}

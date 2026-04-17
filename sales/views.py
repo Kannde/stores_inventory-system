@@ -6,9 +6,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.db import transaction
 from core.views import get_store
-from core.models import StoreStaff
+from core.models import StoreSettings, StoreStaff
 from inventory.models import Product, Package, StockMovement
-from .models import Sale, SaleItem
+from .models import CreditAccount, CreditPayment, Sale, SaleItem
 
 
 @login_required
@@ -42,11 +42,16 @@ def new_sale(request, store_slug):
         'items': [{'product': i.product.name, 'qty': i.quantity} for i in p.items.all()],
     } for p in packages]
 
+    store_settings, _ = StoreSettings.objects.get_or_create(store=store)
+
     return render(request, 'sales/new_sale.html', {
         'store': store,
         'staff': staff,
         'products_json': json.dumps(products_data),
         'packages_json': json.dumps(packages_data),
+        'allow_partial': store_settings.allow_partial_payment,
+        'allow_credit': store_settings.allow_credit,
+        'min_deposit_percent': store_settings.min_deposit_percent,
     })
 
 
@@ -81,12 +86,16 @@ def api_checkout(request, store_slug):
     staff_id = data.get('staff_id')
     payment_method = data.get('payment_method', 'cash')
     amount_paid = data.get('amount_paid', 0)
+    customer_name = data.get('customer_name', '')
+    customer_phone = data.get('customer_phone', '')
 
     with transaction.atomic():
         sale = Sale(
             store=store,
             payment_method=payment_method,
             amount_paid=amount_paid,
+            customer_name=customer_name,
+            customer_phone=customer_phone,
             notes=data.get('notes', ''),
         )
         if staff_id:
@@ -148,6 +157,16 @@ def api_checkout(request, store_slug):
         sale.change_given = max(0, float(amount_paid) - total)
         sale.save(update_fields=['total_amount', 'change_given'])
 
+        if payment_method in ('credit', 'mixed') and customer_name:
+            CreditAccount.objects.create(
+                sale=sale,
+                store=store,
+                customer_name=customer_name,
+                customer_phone=customer_phone,
+                total_amount=total,
+                amount_paid=float(amount_paid),
+            )
+
     return JsonResponse({
         'success': True,
         'sale_id': str(sale.id),
@@ -155,3 +174,34 @@ def api_checkout(request, store_slug):
         'total': str(sale.total_amount),
         'change': str(sale.change_given),
     })
+
+
+@login_required
+def credit_list(request, store_slug):
+    store = get_store(store_slug, request.user)
+    credits = CreditAccount.objects.filter(store=store).select_related('sale').order_by('-created_at')
+    unsettled = credits.filter(is_settled=False)
+    total_outstanding = sum(c.balance_due for c in unsettled)
+    return render(request, 'sales/credit_list.html', {
+        'store': store, 'credits': credits,
+        'total_outstanding': total_outstanding,
+    })
+
+
+@login_required
+def credit_payment(request, store_slug, pk):
+    store = get_store(store_slug, request.user)
+    credit = get_object_or_404(CreditAccount, pk=pk, store=store)
+    if request.method == 'POST':
+        amount = request.POST.get('amount')
+        notes = request.POST.get('notes', '')
+        date = request.POST.get('date') or __import__('django.utils.timezone', fromlist=['now']).now().date()
+        if amount:
+            from django.utils import timezone
+            CreditPayment.objects.create(
+                credit=credit,
+                amount=amount,
+                notes=notes,
+                date=request.POST.get('date') or timezone.now().date(),
+            )
+    return redirect('sales:credit_list', store_slug=store.slug)

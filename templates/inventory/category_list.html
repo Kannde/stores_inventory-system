@@ -8,25 +8,44 @@
 {% endblock %}
 {% block content %}
 <div class="container">
-  <form method="post" class="card" style="display:flex;gap:8px;align-items:flex-end">
+  <form method="post" class="card">
     {% csrf_token %}
-    <div class="form-group" style="flex:1;margin-bottom:0">
-      <label class="form-label">New Category</label>
-      <input type="text" name="name" class="form-input" required placeholder="Category name">
+    <div class="card-title" style="margin-bottom:12px">Add Category</div>
+    <div class="form-group">
+      <label class="form-label">Category Name</label>
+      <input type="text" name="name" id="catNameInput" class="form-input" required placeholder="e.g. Beverages">
     </div>
-    <button type="submit" class="btn btn-primary">Add</button>
+    <div class="form-group">
+      <label class="form-label">Expiry Warning (days)</label>
+      <input type="number" name="expiry_warning_days" class="form-input" value="30" min="1">
+    </div>
+    <button type="submit" class="btn btn-primary btn-block">Add Category</button>
   </form>
 
   <div class="card">
+    <div class="card-title" style="margin-bottom:10px">Standard Retail Categories</div>
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:10px">Tap to add any you don't have yet</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      {% for cat in standard_categories %}
+      <button type="button" class="btn btn-outline" style="font-size:12px;padding:4px 10px"
+        onclick="document.getElementById('catNameInput').value='{{ cat }}';document.getElementById('catNameInput').scrollIntoView({behavior:'smooth'})">
+        {{ cat }}
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:8px">Your Categories ({{ categories.count }})</div>
     {% for c in categories %}
     <div class="list-item" style="margin:0 -16px;padding:10px 16px">
       <div class="list-content">
         <div class="list-title">{{ c.name }}</div>
-        <div class="list-sub">{{ c.products.count }} products</div>
+        <div class="list-sub">{{ c.products.count }} products · Expiry warning: {{ c.expiry_warning_days }} days</div>
       </div>
     </div>
     {% empty %}
-    <div class="empty"><p>No categories yet</p></div>
+    <div class="empty"><p>No categories yet — add one above</p></div>
     {% endfor %}
   </div>
 </div>

@@ -1,7 +1,7 @@
 import uuid
 from django.db import models
 from django.db.models import Sum, F
-from core.models import Store, StoreStaff
+from core.models import Store, StoreStaff  # noqa: F401 Store used by CreditAccount
 from inventory.models import Product, Package
 
 
@@ -28,6 +28,8 @@ class Sale(models.Model):
     change_given = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     payment_method = models.CharField(max_length=10, choices=PAYMENT_CHOICES, default='cash')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='completed')
+    customer_name = models.CharField(max_length=200, blank=True)
+    customer_phone = models.CharField(max_length=20, blank=True)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -72,3 +74,50 @@ class SaleItem(models.Model):
     def save(self, *args, **kwargs):
         self.line_total = self.quantity * self.unit_price
         super().save(*args, **kwargs)
+
+
+class CreditAccount(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    sale = models.OneToOneField(Sale, on_delete=models.CASCADE, related_name='credit_account')
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='credit_accounts')
+    customer_name = models.CharField(max_length=200)
+    customer_phone = models.CharField(max_length=20)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    amount_paid = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    is_settled = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Credit: {self.customer_name} — {self.balance_due}"
+
+    @property
+    def balance_due(self):
+        return self.total_amount - self.amount_paid
+
+
+class CreditPayment(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    credit = models.ForeignKey(CreditAccount, on_delete=models.CASCADE, related_name='payments')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    notes = models.CharField(max_length=300, blank=True)
+    date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date', '-created_at']
+
+    def save(self, *args, **kwargs):
+        is_new = self._state.adding
+        super().save(*args, **kwargs)
+        if is_new:
+            from django.db.models import F
+            CreditAccount.objects.filter(pk=self.credit_id).update(
+                amount_paid=F('amount_paid') + self.amount
+            )
+            self.credit.refresh_from_db()
+            if self.credit.amount_paid >= self.credit.total_amount:
+                CreditAccount.objects.filter(pk=self.credit_id).update(is_settled=True)

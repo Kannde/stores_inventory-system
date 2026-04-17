@@ -127,15 +127,27 @@
     </div>
     <div class="form-group">
       <label class="form-label">Payment Method</label>
-      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px" id="payMethodGrid">
         <button type="button" class="pay-method btn btn-outline active" data-method="cash" onclick="selectPay(this)">Cash</button>
         <button type="button" class="pay-method btn btn-outline" data-method="momo" onclick="selectPay(this)">Mobile Money</button>
         <button type="button" class="pay-method btn btn-outline" data-method="card" onclick="selectPay(this)">Card</button>
-        <button type="button" class="pay-method btn btn-outline" data-method="credit" onclick="selectPay(this)">Credit</button>
+        {% if allow_partial %}<button type="button" class="pay-method btn btn-outline" data-method="mixed" onclick="selectPay(this)">Part Payment</button>{% endif %}
+        {% if allow_credit %}<button type="button" class="pay-method btn btn-outline" data-method="credit" onclick="selectPay(this)">Credit</button>{% endif %}
       </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Amount Received</label>
+    <!-- Customer info — shown for credit/part payments -->
+    <div id="customerFields" style="display:none">
+      <div class="form-group">
+        <label class="form-label">Customer Name *</label>
+        <input type="text" id="customerName" class="form-input" placeholder="Full name">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Customer Phone *</label>
+        <input type="tel" id="customerPhone" class="form-input" placeholder="Phone number" inputmode="tel">
+      </div>
+    </div>
+    <div class="form-group" id="amountPaidGroup">
+      <label class="form-label" id="amountPaidLabel">Amount Received</label>
       <input type="number" id="amountPaid" class="form-input" step="0.01" inputmode="decimal" style="font-size:20px;font-weight:600;text-align:center">
     </div>
     <div id="changeDisplay" style="display:none;text-align:center;padding:10px;background:var(--accent-light);border-radius:var(--radius-sm);margin-bottom:12px">
@@ -318,10 +330,27 @@ function renderCart() {
 }
 
 // ── Checkout ──────────────────────────────────────────────
+const MIN_DEPOSIT = {{ min_deposit_percent|default:30 }};
+
 function selectPay(el) {
   document.querySelectorAll('.pay-method').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
   payMethod = el.dataset.method;
+  const needsCustomer = payMethod === 'credit' || payMethod === 'mixed';
+  document.getElementById('customerFields').style.display = needsCustomer ? 'block' : 'none';
+  const label = document.getElementById('amountPaidLabel');
+  if (payMethod === 'credit') {
+    label.textContent = 'Deposit Amount ({{ store.currency_symbol }})';
+    const total = getTotal();
+    document.getElementById('amountPaid').value = (total * MIN_DEPOSIT / 100).toFixed(2);
+    updateChange();
+  } else if (payMethod === 'mixed') {
+    label.textContent = 'Amount Paid Now ({{ store.currency_symbol }})';
+  } else {
+    label.textContent = 'Amount Received';
+    document.getElementById('amountPaid').value = getTotal().toFixed(2);
+    updateChange();
+  }
 }
 
 function openCheckout() {
@@ -347,6 +376,12 @@ function updateChange() {
 }
 
 async function completeSale() {
+  const needsCustomer = payMethod === 'credit' || payMethod === 'mixed';
+  if (needsCustomer) {
+    const name = document.getElementById('customerName').value.trim();
+    const phone = document.getElementById('customerPhone').value.trim();
+    if (!name || !phone) { alert('Customer name and phone are required for credit/part payments.'); return; }
+  }
   const btn = document.getElementById('confirmBtn');
   btn.disabled = true; btn.textContent = 'Processing...';
   try {
@@ -358,6 +393,8 @@ async function completeSale() {
         staff_id: document.getElementById('staffSelect').value || null,
         payment_method: payMethod,
         amount_paid: parseFloat(document.getElementById('amountPaid').value) || 0,
+        customer_name: document.getElementById('customerName')?.value.trim() || '',
+        customer_phone: document.getElementById('customerPhone')?.value.trim() || '',
         notes: document.getElementById('saleNotes').value,
       }),
     });

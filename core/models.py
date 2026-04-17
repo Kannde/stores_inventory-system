@@ -43,6 +43,28 @@ class Store(models.Model):
         super().save(*args, **kwargs)
 
 
+class StoreSettings(models.Model):
+    PAYMENT_POLICY_CHOICES = [
+        ('upfront', 'Full Payment Upfront'),
+        ('deposit', 'Deposit Required'),
+        ('on_delivery', 'Pay on Delivery/Pickup'),
+    ]
+
+    store = models.OneToOneField(Store, on_delete=models.CASCADE, related_name='settings')
+    allow_partial_payment = models.BooleanField(default=False)
+    allow_credit = models.BooleanField(default=False)
+    min_deposit_percent = models.DecimalField(max_digits=5, decimal_places=2, default=30)
+    preorder_enabled = models.BooleanField(default=True)
+    preorder_payment_policy = models.CharField(max_length=20, choices=PAYMENT_POLICY_CHOICES, default='on_delivery')
+    preorder_deposit_percent = models.DecimalField(max_digits=5, decimal_places=2, default=30)
+    preorder_expected_days = models.PositiveIntegerField(default=7)
+    preorder_welcome_message = models.TextField(blank=True)
+    preorder_whatsapp_number = models.CharField(max_length=20, blank=True, help_text='WhatsApp number with country code, e.g. 233244000000')
+
+    def __str__(self):
+        return f"Settings for {self.store.name}"
+
+
 class StoreStaff(models.Model):
     ROLE_CHOICES = [
         ('manager', 'Manager'),

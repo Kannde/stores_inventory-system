@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}Pre-orders — {{ store.name }}{% endblock %}
+{% block topnav %}
+<div class="topnav"><h1>{{ store.name }}</h1></div>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="empty" style="padding:60px 0">
+    <p style="font-size:16px;font-weight:600">Pre-orders are currently disabled</p>
+    <p style="font-size:14px;color:var(--text-3)">Please contact the store for assistance.</p>
+  </div>
+</div>
+{% endblock %}

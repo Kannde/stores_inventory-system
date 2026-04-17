@@ -1,108 +1,146 @@
 {% extends 'base.html' %}
-{% block title %}Reports - {{ store.name }}{% endblock %}
+{% block title %}P&L Reports - {{ store.name }}{% endblock %}
 {% block topnav %}
 <div class="topnav">
   <a href="{% url 'core:store_dashboard' store.slug %}" class="back">←</a>
-  <h1>Reports</h1>
+  <h1>P&amp;L Reports</h1>
 </div>
 {% endblock %}
 {% block content %}
 <div class="container">
-  <div class="tabs">
+  <div class="tabs" style="overflow-x:auto;white-space:nowrap">
     <a href="?period=7" class="tab {% if period == '7' %}active{% endif %}">7 Days</a>
     <a href="?period=14" class="tab {% if period == '14' %}active{% endif %}">14 Days</a>
     <a href="?period=30" class="tab {% if period == '30' %}active{% endif %}">30 Days</a>
     <a href="?period=90" class="tab {% if period == '90' %}active{% endif %}">90 Days</a>
   </div>
 
-  <div class="stats">
-    <div class="stat">
-      <div class="stat-label">Revenue</div>
-      <div class="stat-value accent">{{ store.currency_symbol }}{{ total_revenue|floatformat:0 }}</div>
+  <!-- P&L Summary -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:12px">Profit & Loss Summary</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="padding:12px;background:var(--surface-2);border-radius:var(--radius)">
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">Revenue</div>
+        <div style="font-size:20px;font-weight:700;color:var(--accent)">{{ store.currency_symbol }}{{ total_revenue|floatformat:2 }}</div>
+      </div>
+      <div style="padding:12px;background:var(--surface-2);border-radius:var(--radius)">
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">Cost of Goods</div>
+        <div style="font-size:20px;font-weight:700;color:var(--danger)">{{ store.currency_symbol }}{{ total_cogs|floatformat:2 }}</div>
+      </div>
+      <div style="padding:12px;background:{% if gross_profit >= 0 %}var(--accent-light){% else %}#fff0f0{% endif %};border-radius:var(--radius);grid-column:span 2">
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">Gross Profit · {{ margin_pct }}% margin</div>
+        <div style="font-size:24px;font-weight:700;color:{% if gross_profit >= 0 %}var(--accent){% else %}var(--danger){% endif %}">
+          {{ store.currency_symbol }}{{ gross_profit|floatformat:2 }}
+        </div>
+      </div>
     </div>
+  </div>
+
+  <div class="stats">
     <div class="stat">
       <div class="stat-label">Sales</div>
       <div class="stat-value">{{ total_sales }}</div>
     </div>
-    <div class="stat" style="grid-column:span 2">
+    <div class="stat">
       <div class="stat-label">Avg Sale</div>
-      <div class="stat-value">{{ store.currency_symbol }}{{ avg_sale|floatformat:2 }}</div>
+      <div class="stat-value accent">{{ store.currency_symbol }}{{ avg_sale|floatformat:0 }}</div>
+    </div>
+    <div class="stat" style="grid-column:span 2">
+      <div class="stat-label">Period</div>
+      <div class="stat-value" style="font-size:14px">{{ start_date|date:"d M" }} – Today</div>
     </div>
   </div>
 
+  <!-- Revenue vs Profit Chart -->
   <div class="card">
-    <div class="card-title" style="margin-bottom:12px">Revenue Trend</div>
-    <canvas id="revenueChart" height="200"></canvas>
+    <div class="card-title" style="margin-bottom:12px">Revenue vs Profit Trend</div>
+    <canvas id="plChart" height="200"></canvas>
   </div>
 
+  <!-- Top Products by Profit -->
+  {% if top_products %}
   <div class="card">
     <div class="card-title" style="margin-bottom:12px">Top Products</div>
-    <div id="topProducts">
-      <div class="empty"><p>Loading...</p></div>
+    {% for p in top_products %}
+    <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <span style="font-size:13px;font-weight:500">{{ forloop.counter }}. {{ p.product__name }}</span>
+        <span style="font-size:13px;font-weight:700;color:var(--accent)">+{{ store.currency_symbol }}{{ p.profit|floatformat:2 }}</span>
+      </div>
+      <div style="display:flex;gap:12px;font-size:11px;color:var(--text-3)">
+        <span>Rev: {{ store.currency_symbol }}{{ p.total_rev|floatformat:2 }}</span>
+        <span>COGS: {{ store.currency_symbol }}{{ p.cogs|floatformat:2 }}</span>
+        <span>Qty: {{ p.total_qty }}</span>
+      </div>
     </div>
+    {% endfor %}
   </div>
+  {% endif %}
+
+  <!-- Category Breakdown -->
+  {% if category_breakdown %}
+  <div class="card">
+    <div class="card-title" style="margin-bottom:12px">Revenue by Category</div>
+    {% for c in category_breakdown %}
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:13px">{{ c.product__category__name }}</span>
+      <div style="text-align:right">
+        <div style="font-size:13px;font-weight:600;color:var(--accent)">{{ store.currency_symbol }}{{ c.total_rev|floatformat:2 }}</div>
+        <div style="font-size:11px;color:var(--text-3)">{{ c.total_qty }} sold</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
 </div>
 {% endblock %}
 {% block bottomnav %}{% with nav='reports' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}
 {% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
-const STORE_SLUG = '{{ store.slug }}';
 const CURRENCY = '{{ store.currency_symbol }}';
-const DAYS = {{ period }};
-
-async function loadChart() {
-  const res = await fetch(`/s/${STORE_SLUG}/reports/api/sales-chart/?days=${DAYS}`);
-  const data = await res.json();
-  const ctx = document.getElementById('revenueChart').getContext('2d');
-  new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: data.map(d => d.date),
-      datasets: [{
+const dailyData = {{ daily_data_json|safe }};
+const ctx = document.getElementById('plChart').getContext('2d');
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: dailyData.map(d => d.date),
+    datasets: [
+      {
         label: 'Revenue',
-        data: data.map(d => d.revenue),
-        backgroundColor: '#2d6a4f22',
+        data: dailyData.map(d => d.revenue),
+        backgroundColor: '#2d6a4f33',
         borderColor: '#2d6a4f',
         borderWidth: 1.5,
-        borderRadius: 6,
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { beginAtZero: true, ticks: { callback: v => CURRENCY + v } },
-        x: { grid: { display: false } }
+        borderRadius: 4,
+        order: 2,
+      },
+      {
+        label: 'Profit',
+        data: dailyData.map(d => d.profit),
+        type: 'line',
+        borderColor: '#52b788',
+        backgroundColor: '#52b78833',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        order: 1,
       }
+    ]
+  },
+  options: {
+    responsive: true,
+    interaction: { mode: 'index' },
+    plugins: {
+      legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${CURRENCY}${ctx.parsed.y.toFixed(2)}` } }
+    },
+    scales: {
+      y: { beginAtZero: true, ticks: { callback: v => CURRENCY + v } },
+      x: { grid: { display: false } }
     }
-  });
-}
-
-async function loadTopProducts() {
-  const res = await fetch(`/s/${STORE_SLUG}/reports/api/top-products/?days=${DAYS}`);
-  const data = await res.json();
-  const el = document.getElementById('topProducts');
-  if (!data.length) { el.innerHTML = '<div class="empty"><p>No product sales data</p></div>'; return; }
-
-  const maxRev = Math.max(...data.map(d => d.total_rev));
-  el.innerHTML = data.map((d, i) => `
-    <div style="padding:8px 0;border-bottom:1px solid var(--border)">
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-        <span style="font-size:13px;font-weight:500">${i+1}. ${d.product__name}</span>
-        <span style="font-size:13px;font-weight:600;color:var(--accent)">${CURRENCY}${d.total_rev.toFixed(2)}</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <div style="flex:1;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden">
-          <div style="width:${(d.total_rev/maxRev*100).toFixed(0)}%;height:100%;background:var(--accent);border-radius:3px"></div>
-        </div>
-        <span style="font-size:11px;color:var(--text-3)">${d.total_qty} sold</span>
-      </div>
-    </div>
-  `).join('');
-}
-
-loadChart();
-loadTopProducts();
+  }
+});
 </script>
 {% endblock %}

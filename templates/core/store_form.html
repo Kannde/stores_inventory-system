@@ -1,46 +1,119 @@
 {% extends 'base.html' %}
-{% block title %}Edit Store - {{ store.name }}{% endblock %}
+{% block title %}Store Settings - {{ store.name }}{% endblock %}
 {% block topnav %}
 <div class="topnav">
   <a href="{% url 'core:store_dashboard' store.slug %}" class="back">&larr;</a>
-  <h1>Edit Store</h1>
+  <h1>Store Settings</h1>
   <a href="{% url 'core:logout' %}" class="action">Logout</a>
 </div>
 {% endblock %}
 {% block content %}
 <div class="container">
-  <form method="post" enctype="multipart/form-data" class="card">
+  <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
-    <div class="form-group">
-      <label class="form-label">Store Name *</label>
-      <input type="text" name="name" class="form-input" required value="{{ form.name.value|default:'' }}">
-      {% if form.name.errors %}<div style="font-size:12px;color:var(--danger);margin-top:4px">{{ form.name.errors|join:', ' }}</div>{% endif %}
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px">Store Details</div>
+      <div class="form-group">
+        <label class="form-label">Store Name *</label>
+        <input type="text" name="name" class="form-input" required value="{{ form.name.value|default:'' }}">
+        {% if form.name.errors %}<div style="font-size:12px;color:var(--danger);margin-top:4px">{{ form.name.errors|join:', ' }}</div>{% endif %}
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone</label>
+        <input type="tel" name="phone" class="form-input" value="{{ form.phone.value|default:'' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Location</label>
+        <input type="text" name="location" class="form-input" value="{{ form.location.value|default:'' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Currency Symbol</label>
+        <input type="text" name="currency_symbol" class="form-input" value="{{ form.currency_symbol.value|default:'' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea name="description" class="form-textarea">{{ form.description.value|default:'' }}</textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Logo</label>
+        <input type="file" name="logo" class="form-input" accept="image/*">
+        {% if store.logo %}
+        <img src="{{ store.logo.url }}" alt="{{ store.name }}" style="margin-top:8px;max-width:80px;border-radius:10px;border:1px solid var(--border)">
+        {% endif %}
+      </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Phone</label>
-      <input type="tel" name="phone" class="form-input" value="{{ form.phone.value|default:'' }}">
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px">Payment Settings</div>
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer">
+        <input type="checkbox" name="allow_partial_payment" {% if store_settings.allow_partial_payment %}checked{% endif %} style="width:18px;height:18px;accent-color:var(--accent)">
+        <div>
+          <div style="font-weight:600;font-size:14px">Allow Part Payments</div>
+          <div style="font-size:12px;color:var(--text-3)">Customer can pay a deposit and clear balance later</div>
+        </div>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 0;cursor:pointer">
+        <input type="checkbox" name="allow_credit" {% if store_settings.allow_credit %}checked{% endif %} style="width:18px;height:18px;accent-color:var(--accent)">
+        <div>
+          <div style="font-weight:600;font-size:14px">Allow Credit Sales</div>
+          <div style="font-size:12px;color:var(--text-3)">Sell now and collect payment later (track credit accounts)</div>
+        </div>
+      </label>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Minimum Deposit (%)</label>
+        <input type="number" name="min_deposit_percent" class="form-input" min="0" max="100" step="1"
+          value="{{ store_settings.min_deposit_percent|floatformat:0 }}">
+        <div style="font-size:11px;color:var(--text-3);margin-top:3px">Minimum % of total required upfront for partial payments</div>
+      </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Location</label>
-      <input type="text" name="location" class="form-input" value="{{ form.location.value|default:'' }}">
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:4px">Pre-order Configuration</div>
+      <div style="font-size:12px;color:var(--text-3);margin-bottom:12px">
+        Share link: <strong>{{ request.scheme }}://{{ request.get_host }}/s/{{ store.slug }}/preorders/</strong>
+      </div>
+
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer">
+        <input type="checkbox" name="preorder_enabled" {% if store_settings.preorder_enabled %}checked{% endif %} style="width:18px;height:18px;accent-color:var(--accent)">
+        <div>
+          <div style="font-weight:600;font-size:14px">Enable Pre-orders</div>
+          <div style="font-size:12px;color:var(--text-3)">Customers can submit pre-order requests</div>
+        </div>
+      </label>
+
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Payment Policy</label>
+        <select name="preorder_payment_policy" class="form-select">
+          <option value="on_delivery" {% if store_settings.preorder_payment_policy == 'on_delivery' %}selected{% endif %}>Pay on Delivery/Pickup</option>
+          <option value="upfront" {% if store_settings.preorder_payment_policy == 'upfront' %}selected{% endif %}>Full Payment Upfront</option>
+          <option value="deposit" {% if store_settings.preorder_payment_policy == 'deposit' %}selected{% endif %}>Deposit Required</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Deposit Percent (%)</label>
+        <input type="number" name="preorder_deposit_percent" class="form-input" min="0" max="100"
+          value="{{ store_settings.preorder_deposit_percent|floatformat:0 }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Expected Fulfillment Days</label>
+        <input type="number" name="preorder_expected_days" class="form-input" min="1"
+          value="{{ store_settings.preorder_expected_days }}">
+        <div style="font-size:11px;color:var(--text-3);margin-top:3px">Shown to customers as expected wait time</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Welcome Message</label>
+        <textarea name="preorder_welcome_message" class="form-textarea" rows="3" placeholder="e.g. Welcome! Place your order and we'll confirm within 24 hours.">{{ store_settings.preorder_welcome_message }}</textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">WhatsApp Number (for notifications)</label>
+        <input type="text" name="preorder_whatsapp_number" class="form-input"
+          value="{{ store_settings.preorder_whatsapp_number }}" placeholder="e.g. 233244000000">
+        <div style="font-size:11px;color:var(--text-3);margin-top:3px">Include country code, no + or spaces. Used to generate WhatsApp share links.</div>
+      </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Currency Symbol</label>
-      <input type="text" name="currency_symbol" class="form-input" value="{{ form.currency_symbol.value|default:'' }}">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Description</label>
-      <textarea name="description" class="form-textarea">{{ form.description.value|default:'' }}</textarea>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Logo</label>
-      <input type="file" name="logo" class="form-input" accept="image/*">
-      {% if store.logo %}
-      <div style="margin-top:10px;font-size:12px;color:var(--text-3)">Current logo:</div>
-      <img src="{{ store.logo.url }}" alt="{{ store.name }}" style="margin-top:8px;max-width:96px;border-radius:12px;border:1px solid var(--border)">
-      {% endif %}
-    </div>
-    <button type="submit" class="btn btn-primary btn-block">Save Store</button>
+
+    <button type="submit" class="btn btn-primary btn-block" style="margin-bottom:24px">Save Settings</button>
   </form>
 </div>
 {% endblock %}

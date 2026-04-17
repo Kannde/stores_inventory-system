@@ -45,6 +45,8 @@ def product_form(request, store_slug, pk=None):
         product.unit_label = data.get('unit_label', 'unit')
         product.stock_qty = data.get('stock_qty', 0) or 0
         product.reorder_level = data.get('reorder_level', 5) or 5
+        expiry = data.get('expiry_date', '').strip()
+        product.expiry_date = expiry if expiry else None
         cat_id = data.get('category')
         product.category_id = cat_id if cat_id else None
         sup_id = data.get('supplier')
@@ -92,17 +94,36 @@ def stock_adjust(request, store_slug, pk):
     })
 
 
+STANDARD_RETAIL_CATEGORIES = [
+    'Beverages', 'Bread & Bakery', 'Breakfast & Cereal', 'Canned & Packaged Goods',
+    'Condiments & Sauces', 'Confectionery & Sweets', 'Dairy & Eggs', 'Frozen Foods',
+    'Fresh Produce', 'Grains & Rice', 'Meat & Poultry', 'Seafood', 'Snacks & Chips',
+    'Spices & Seasonings', 'Beverages - Alcohol', 'Baby & Infant', 'Beauty & Personal Care',
+    'Cleaning Supplies', 'Health & Wellness', 'Household Items', 'Laundry & Detergents',
+    'Office & Stationery', 'Pet Supplies', 'Toys & Games', 'Clothing & Apparel',
+    'Electronics & Accessories', 'Hardware & Tools', 'Automotive', 'Sports & Outdoor',
+    'Books & Media', 'Phones & Accessories', 'Fertilizers & Agrochemicals',
+    'Veterinary & Animal Feed', 'Fabric & Sewing', 'Gift & Seasonal',
+]
+
+
 @login_required
 def category_list(request, store_slug):
     store = get_store(store_slug, request.user)
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
+        expiry_warning_days = int(request.POST.get('expiry_warning_days', 30) or 30)
         if name:
-            Category.objects.get_or_create(store=store, name=name)
+            obj, created = Category.objects.get_or_create(store=store, name=name)
+            if created:
+                obj.expiry_warning_days = expiry_warning_days
+                obj.save(update_fields=['expiry_warning_days'])
         return redirect('inventory:category_list', store_slug=store.slug)
     categories = Category.objects.filter(store=store)
+    existing_names = set(categories.values_list('name', flat=True))
     return render(request, 'inventory/category_list.html', {
         'store': store, 'categories': categories,
+        'standard_categories': [c for c in STANDARD_RETAIL_CATEGORIES if c not in existing_names],
     })
 
 
@@ -155,12 +176,24 @@ def package_form(request, store_slug, pk=None):
 
 @login_required
 def stock_overview(request, store_slug):
+    from django.utils import timezone
     store = get_store(store_slug, request.user)
-    products = Product.objects.filter(store=store, is_active=True).order_by('stock_qty')
+    products = Product.objects.filter(store=store, is_active=True).select_related('category').order_by('stock_qty')
     low = products.filter(stock_qty__lte=F('reorder_level'), stock_qty__gt=0)
     out = products.filter(stock_qty__lte=0)
+    today = timezone.now().date()
+    from datetime import timedelta as td
+    expiring_soon = products.filter(
+        expiry_date__isnull=False,
+        expiry_date__gte=today,
+        expiry_date__lte=today + td(days=30),
+    ).order_by('expiry_date')
+    expired = products.filter(expiry_date__isnull=False, expiry_date__lt=today)
     return render(request, 'inventory/stock_overview.html', {
-        'store': store, 'products': products, 'low_stock': low, 'out_of_stock': out,
+        'store': store, 'products': products,
+        'low_stock': low, 'out_of_stock': out,
+        'expiring_soon': expiring_soon, 'expired': expired,
+        'today': today,
     })
 
 
@@ -252,6 +285,16 @@ def supplier_toggle(request, store_slug, pk):
     supplier.is_active = not supplier.is_active
     supplier.save(update_fields=['is_active'])
     return redirect('inventory:supplier_list', store_slug=store.slug)
+
+
+@login_required
+def barcode_print(request, store_slug, pk):
+    store = get_store(store_slug, request.user)
+    product = get_object_or_404(Product, pk=pk, store=store)
+    qty = int(request.GET.get('qty', 1))
+    return render(request, 'inventory/barcode_print.html', {
+        'store': store, 'product': product, 'qty': range(qty),
+    })
 
 
 @login_required

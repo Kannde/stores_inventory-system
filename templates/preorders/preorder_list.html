@@ -8,6 +8,24 @@
 {% endblock %}
 {% block content %}
 <div class="container">
+
+  <!-- Share link card -->
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div class="card-title">Customer Pre-order Link</div>
+      <a href="{% url 'core:store_settings' store.slug %}" style="font-size:12px;color:var(--text-3)">Configure</a>
+    </div>
+    <div style="font-size:12px;color:var(--text-3);word-break:break-all;padding:8px;background:var(--surface-2);border-radius:6px;margin-bottom:8px" id="shareUrl">
+      {{ request.scheme }}://{{ request.get_host }}/s/{{ store.slug }}/preorders/
+    </div>
+    <div style="display:flex;gap:8px">
+      <button type="button" class="btn btn-outline btn-sm" style="flex:1" onclick="copyLink()">Copy Link</button>
+      {% if store_settings.preorder_whatsapp_number %}
+      <a href="https://wa.me/{{ store_settings.preorder_whatsapp_number }}?text={{ request.scheme }}%3A%2F%2F{{ request.get_host }}%2Fs%2F{{ store.slug }}%2Fpreorders%2F" target="_blank" class="btn btn-outline btn-sm" style="flex:1;text-align:center;color:#25d366">Share via WhatsApp</a>
+      {% endif %}
+    </div>
+  </div>
+
   <div class="tabs">
     <a href="?status=pending" class="tab {% if current_status == 'pending' %}active{% endif %}">Pending</a>
     <a href="?status=confirmed" class="tab {% if current_status == 'confirmed' %}active{% endif %}">Confirmed</a>
@@ -38,3 +56,16 @@
 </div>
 {% endblock %}
 {% block bottomnav %}{% with nav='dashboard' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}
+{% block scripts %}
+<script>
+function copyLink() {
+  const url = document.getElementById('shareUrl').textContent.trim();
+  navigator.clipboard.writeText(url).then(() => alert('Link copied!')).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = url; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    alert('Link copied!');
+  });
+}
+</script>
+{% endblock %}

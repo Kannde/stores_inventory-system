@@ -7,9 +7,31 @@
 {% endblock %}
 {% block content %}
 <div class="container">
+  {% if store_settings.preorder_welcome_message %}
+  <div class="card" style="margin-bottom:14px;background:var(--accent-light);border:1px solid var(--accent)">
+    <div style="font-size:14px;color:var(--accent-dark)">{{ store_settings.preorder_welcome_message }}</div>
+  </div>
+  {% else %}
   <div style="text-align:center;padding:12px 0 20px">
     <div style="font-size:15px;color:var(--text-2)">Tell us what you need and we'll prepare it for you</div>
   </div>
+  {% endif %}
+
+  {% if store_settings.preorder_payment_policy == 'upfront' %}
+  <div class="card" style="margin-bottom:14px;background:var(--info-light);border:1px solid var(--info)">
+    <div style="font-size:13px;font-weight:600;color:var(--info)">Payment Policy: Full payment required upfront</div>
+  </div>
+  {% elif store_settings.preorder_payment_policy == 'deposit' %}
+  <div class="card" style="margin-bottom:14px;background:var(--info-light);border:1px solid var(--info)">
+    <div style="font-size:13px;font-weight:600;color:var(--info)">Payment Policy: {{ store_settings.preorder_deposit_percent|floatformat:0 }}% deposit required</div>
+  </div>
+  {% endif %}
+
+  {% if store_settings.preorder_expected_days %}
+  <div style="text-align:center;font-size:13px;color:var(--text-3);margin-bottom:16px">
+    Expected fulfillment in {{ store_settings.preorder_expected_days }} day{{ store_settings.preorder_expected_days|pluralize }}
+  </div>
+  {% endif %}
 
   <form method="post">
     {% csrf_token %}
