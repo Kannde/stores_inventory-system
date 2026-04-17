@@ -377,6 +377,11 @@ function updateChange() {
   } else { el.style.display = 'none'; }
 }
 
+function getCsrfToken() {
+  return document.cookie.split(';').map(c => c.trim())
+    .find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
+}
+
 async function completeSale() {
   const needsCustomer = payMethod === 'credit' || payMethod === 'mixed';
   if (needsCustomer) {
@@ -386,19 +391,38 @@ async function completeSale() {
   }
   const btn = document.getElementById('confirmBtn');
   btn.disabled = true; btn.textContent = 'Processing...';
+
+  const payload = {
+    items: cart,
+    staff_id: document.getElementById('staffSelect').value || null,
+    payment_method: payMethod,
+    amount_paid: parseFloat(document.getElementById('amountPaid').value) || 0,
+    customer_name: document.getElementById('customerName')?.value.trim() || '',
+    customer_phone: document.getElementById('customerPhone')?.value.trim() || '',
+    notes: document.getElementById('saleNotes').value,
+  };
+
+  if (!navigator.onLine) {
+    // Queue for later sync
+    const id = await window.queueSale(
+      `/s/${STORE_SLUG}/sales/api/checkout/`, payload, getCsrfToken()
+    );
+    closeCheckout();
+    document.getElementById('receiptNumber').textContent = 'QUEUED-' + id;
+    document.getElementById('receiptTotal').textContent = CURRENCY + getTotal().toFixed(2);
+    document.getElementById('receiptChange').style.display = 'block';
+    document.getElementById('receiptChange').textContent = 'Offline — sale will sync when reconnected';
+    document.getElementById('receiptLink').href = '#';
+    document.getElementById('receiptModal').classList.add('open');
+    btn.disabled = false; btn.textContent = 'Complete Sale';
+    return;
+  }
+
   try {
     const res = await fetch(`/s/${STORE_SLUG}/sales/api/checkout/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        items: cart,
-        staff_id: document.getElementById('staffSelect').value || null,
-        payment_method: payMethod,
-        amount_paid: parseFloat(document.getElementById('amountPaid').value) || 0,
-        customer_name: document.getElementById('customerName')?.value.trim() || '',
-        customer_phone: document.getElementById('customerPhone')?.value.trim() || '',
-        notes: document.getElementById('saleNotes').value,
-      }),
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (data.success) {
@@ -412,7 +436,19 @@ async function completeSale() {
       document.getElementById('receiptLink').href = `/s/${STORE_SLUG}/sales/${data.sale_id}/receipt/`;
       document.getElementById('receiptModal').classList.add('open');
     } else { alert(data.error || 'Error processing sale'); }
-  } catch (e) { alert('Network error'); }
+  } catch (e) {
+    // Network error — queue it
+    const id = await window.queueSale(
+      `/s/${STORE_SLUG}/sales/api/checkout/`, payload, getCsrfToken()
+    );
+    closeCheckout();
+    document.getElementById('receiptNumber').textContent = 'QUEUED-' + id;
+    document.getElementById('receiptTotal').textContent = CURRENCY + getTotal().toFixed(2);
+    document.getElementById('receiptChange').style.display = 'block';
+    document.getElementById('receiptChange').textContent = 'Offline — sale queued for sync';
+    document.getElementById('receiptLink').href = '#';
+    document.getElementById('receiptModal').classList.add('open');
+  }
   btn.disabled = false; btn.textContent = 'Complete Sale';
 }
 

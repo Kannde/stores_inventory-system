@@ -104,7 +104,7 @@
     <h2 style="font-size:18px;font-weight:600;margin-bottom:4px">Complete Your Order</h2>
     <div id="orderSummaryText" style="font-size:13px;color:var(--text-3);margin-bottom:16px"></div>
 
-    <form method="post" id="orderForm">
+    <form method="post" id="orderForm" onsubmit="return handleOrderSubmit(event)">
       {% csrf_token %}
       <input type="hidden" name="items_json" id="itemsJsonInput">
 
@@ -257,6 +257,32 @@ document.getElementById('searchInput').addEventListener('input', function() { re
 document.querySelectorAll('.modal-overlay').forEach(el => {
   el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
 });
+
+function getCsrfToken() {
+  return document.cookie.split(';').map(c => c.trim())
+    .find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
+}
+
+async function handleOrderSubmit(e) {
+  if (navigator.onLine) return true; // let normal form submit happen
+  e.preventDefault();
+
+  const form = document.getElementById('orderForm');
+  const data = {};
+  new FormData(form).forEach((v, k) => { data[k] = v; });
+  const csrfToken = getCsrfToken();
+
+  await window.queuePreorder(form.action || window.location.href, data, csrfToken);
+
+  // Show success message
+  document.getElementById('orderModal').classList.remove('open');
+  cart = [];
+  renderCatalog('');
+  renderCart();
+  if (window.showPwaToast) showPwaToast('Pre-order saved — will sync when online', 'success');
+  else alert('Pre-order saved offline — will sync when reconnected.');
+  return false;
+}
 
 renderCatalog('');
 </script>

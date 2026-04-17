@@ -1,12 +1,15 @@
 from datetime import timedelta
 
 from django.contrib import messages
+from django.views.decorators.cache import never_cache
 from django.contrib.admin.models import LogEntry
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db.models import Count, F, Q, Sum
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.utils import timezone
 
 from .access import (
@@ -330,3 +333,16 @@ def store_settings(request, store_slug):
         'store_settings': settings_obj,
         **build_store_permissions(request.user, store),
     })
+
+
+@never_cache
+def service_worker(request):
+    import hashlib, time
+    version = hashlib.md5(str(int(time.time() / 3600)).encode()).hexdigest()[:8]
+    content = render_to_string('sw.js', {'cache_version': version})
+    return HttpResponse(content, content_type='application/javascript; charset=utf-8',
+                        headers={'Service-Worker-Allowed': '/'})
+
+
+def offline_view(request):
+    return render(request, 'offline.html')

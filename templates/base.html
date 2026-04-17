@@ -4,6 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>{% block title %}SalesApp{% endblock %}</title>
+<!-- PWA -->
+<link rel="manifest" href="{% static 'manifest.json' %}">
+<meta name="theme-color" content="#2d6a4f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Stores">
+<link rel="apple-touch-icon" href="{% static 'icons/icon-192.png' %}">
+<link rel="icon" type="image/png" sizes="32x32" href="{% static 'icons/favicon-32.png' %}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -251,6 +260,18 @@ a { color: var(--accent); text-decoration: none; }
 </head>
 <body>
 {% block topnav %}{% endblock %}
+<!-- Offline indicator -->
+<div id="offlineBar" style="display:none;background:#1b4332;color:#fff;padding:8px 16px;text-align:center;font-size:13px;font-weight:600;align-items:center;justify-content:center;gap:8px;position:sticky;top:var(--nav-h);z-index:89">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.56 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+  Offline — changes will sync when reconnected
+  <span id="pendingSyncBadge" style="display:none;background:#fff;color:#1b4332;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px"></span>
+</div>
+<!-- Install App prompt -->
+<div id="installAppBtn" style="display:none;background:var(--accent-light);border-bottom:1px solid var(--border);padding:10px 16px;align-items:center;gap:10px;justify-content:center">
+  <span style="font-size:13px;font-weight:500;color:var(--accent-dark)">Install Stores app for faster access</span>
+  <button onclick="installPWA()" class="btn btn-primary btn-sm">Install</button>
+  <button onclick="this.closest('#installAppBtn').style.display='none'" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-3)">×</button>
+</div>
 {% if messages %}
 <div class="alerts">
   {% for message in messages %}
@@ -261,5 +282,6 @@ a { color: var(--accent); text-decoration: none; }
 {% block content %}{% endblock %}
 {% block bottomnav %}{% endblock %}
 {% block scripts %}{% endblock %}
+<script src="{% static 'js/pwa.js' %}"></script>
 </body>
 </html>

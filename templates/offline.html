@@ -1,0 +1,44 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>You're Offline — Stores</title>
+<link rel="manifest" href="{% static 'manifest.json' %}">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', system-ui, sans-serif; background: #f6f5f0; color: #1a1a18; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100dvh; padding: 24px; text-align: center; }
+  .icon { width: 80px; height: 80px; border-radius: 50%; background: #d8f3dc; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  p { font-size: 14px; color: #6b6a64; line-height: 1.6; max-width: 300px; margin-bottom: 24px; }
+  .btn { background: #2d6a4f; color: #fff; border: none; border-radius: 10px; padding: 12px 28px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .status { margin-top: 20px; font-size: 13px; color: #9c9a92; }
+  #onlineStatus { color: #2d6a4f; font-weight: 600; display: none; }
+</style>
+</head>
+<body>
+  <div class="icon">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#2d6a4f" stroke-width="2">
+      <line x1="1" y1="1" x2="23" y2="23"/>
+      <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+      <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+      <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
+      <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+      <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+      <circle cx="12" cy="20" r="1"/>
+    </svg>
+  </div>
+  <h1>You're Offline</h1>
+  <p>No internet connection. Any sales or orders you make will be saved and automatically synced when you're back online.</p>
+  <button class="btn" onclick="window.location.reload()">Try Again</button>
+  <div class="status">
+    <span id="onlineStatus">Back online! Reloading...</span>
+  </div>
+  <script>
+    window.addEventListener('online', () => {
+      document.getElementById('onlineStatus').style.display = 'block';
+      setTimeout(() => window.location.href = '/', 1500);
+    });
+  </script>
+</body>
+</html>
