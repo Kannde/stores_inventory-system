@@ -4,11 +4,11 @@ from .base import *
 DEBUG = False
 DATABASES = database_config()
 ALLOWED_HOSTS = env_list(
-    "ALLOWED_HOSTS",
+    "DJANGO_ALLOWED_HOSTS",
     "staging.localhost,127.0.0.1,localhost",
 )
 CSRF_TRUSTED_ORIGINS = env_list(
-    "CSRF_TRUSTED_ORIGINS",
+    "DJANGO_CSRF_TRUSTED_ORIGINS",
     "http://127.0.0.1:8000,http://localhost:8000,https://staging.example.com",
 )
 
