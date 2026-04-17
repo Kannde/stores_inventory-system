@@ -2,34 +2,57 @@
 {% block title %}{% if staff_member %}Edit{% else %}Add{% endif %} Staff - {{ store.name }}{% endblock %}
 {% block topnav %}
 <div class="topnav">
-  <a href="{% url 'core:staff_list' store.slug %}" class="back">←</a>
+  <a href="{% url 'core:staff_list' store.slug %}" class="back">&larr;</a>
   <h1>{% if staff_member %}Edit Staff{% else %}Add Staff{% endif %}</h1>
+  <a href="{% url 'core:logout' %}" class="action">Logout</a>
 </div>
 {% endblock %}
 {% block content %}
 <div class="container">
   <form method="post" class="card">
     {% csrf_token %}
+    {% if form.non_field_errors %}
+    <div class="alert error" style="margin-bottom:14px">{{ form.non_field_errors|join:', ' }}</div>
+    {% endif %}
     <div class="form-group">
       <label class="form-label">Full Name *</label>
-      <input type="text" name="name" class="form-input" required value="{{ staff_member.name|default:'' }}">
+      <input type="text" name="name" class="form-input" required value="{{ form.name.value|default:'' }}">
+      {% if form.name.errors %}<div style="font-size:12px;color:var(--danger);margin-top:4px">{{ form.name.errors|join:', ' }}</div>{% endif %}
     </div>
     <div class="form-group">
       <label class="form-label">Phone</label>
-      <input type="tel" name="phone" class="form-input" value="{{ staff_member.phone|default:'' }}">
+      <input type="tel" name="phone" class="form-input" value="{{ form.phone.value|default:'' }}">
     </div>
     <div class="form-group">
       <label class="form-label">Role</label>
       <select name="role" class="form-select">
-        <option value="sales" {% if staff_member.role == 'sales' %}selected{% endif %}>Sales Person</option>
-        <option value="manager" {% if staff_member.role == 'manager' %}selected{% endif %}>Manager</option>
-        <option value="stock" {% if staff_member.role == 'stock' %}selected{% endif %}>Stock Keeper</option>
+        <option value="sales" {% if form.role.value == 'sales' %}selected{% endif %}>Sales Person</option>
+        <option value="manager" {% if form.role.value == 'manager' %}selected{% endif %}>Manager</option>
+        <option value="stock" {% if form.role.value == 'stock' %}selected{% endif %}>Stock Keeper</option>
       </select>
     </div>
     <div class="form-group">
       <label class="form-label">PIN (for quick login)</label>
-      <input type="text" name="pin" class="form-input" maxlength="6" inputmode="numeric" value="{{ staff_member.pin|default:'' }}">
+      <input type="text" name="pin" class="form-input" maxlength="6" inputmode="numeric" value="{{ form.pin.value|default:'' }}">
     </div>
+    <div class="form-group">
+      <label class="form-label">Login Username</label>
+      <input type="text" name="username" class="form-input" value="{{ form.username.value|default:'' }}" autocomplete="off">
+      <div style="font-size:12px;color:var(--text-3);margin-top:4px">Optional. Add this if the staff member should sign in directly.</div>
+      {% if form.username.errors %}<div style="font-size:12px;color:var(--danger);margin-top:4px">{{ form.username.errors|join:', ' }}</div>{% endif %}
+    </div>
+    <div class="form-group">
+      <label class="form-label">{% if staff_member and staff_member.user %}New Password{% else %}Password{% endif %}</label>
+      <input type="password" name="password" class="form-input" autocomplete="new-password">
+      <div style="font-size:12px;color:var(--text-3);margin-top:4px">
+        {% if staff_member and staff_member.user %}Leave blank to keep the current password.{% else %}Required only when creating a login username.{% endif %}
+      </div>
+      {% if form.password.errors %}<div style="font-size:12px;color:var(--danger);margin-top:4px">{{ form.password.errors|join:', ' }}</div>{% endif %}
+    </div>
+    <label style="display:flex;align-items:center;gap:10px;font-size:14px;margin-bottom:16px">
+      <input type="checkbox" name="is_active" value="on" {% if form.is_active.value %}checked{% endif %}>
+      Staff account is active
+    </label>
     <button type="submit" class="btn btn-primary btn-block">{% if staff_member %}Save Changes{% else %}Add Staff{% endif %}</button>
   </form>
 </div>

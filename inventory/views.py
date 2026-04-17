@@ -1,4 +1,5 @@
 import json
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from django.db.models import F, Q
@@ -6,8 +7,9 @@ from core.views import get_store
 from .models import Category, Product, ProductImage, Package, PackageItem, StockMovement
 
 
+@login_required
 def product_list(request, store_slug):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     q = request.GET.get('q', '')
     cat = request.GET.get('cat', '')
     products = Product.objects.filter(store=store)
@@ -22,8 +24,9 @@ def product_list(request, store_slug):
     })
 
 
+@login_required
 def product_form(request, store_slug, pk=None):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     product = get_object_or_404(Product, pk=pk, store=store) if pk else None
     categories = Category.objects.filter(store=store)
 
@@ -54,8 +57,9 @@ def product_form(request, store_slug, pk=None):
     })
 
 
+@login_required
 def stock_adjust(request, store_slug, pk):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     product = get_object_or_404(Product, pk=pk, store=store)
 
     if request.method == 'POST':
@@ -84,8 +88,9 @@ def stock_adjust(request, store_slug, pk):
     })
 
 
+@login_required
 def category_list(request, store_slug):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         if name:
@@ -97,20 +102,23 @@ def category_list(request, store_slug):
     })
 
 
+@login_required
 def category_form(request, store_slug):
     return category_list(request, store_slug)
 
 
+@login_required
 def package_list(request, store_slug):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     packages = Package.objects.filter(store=store).prefetch_related('items__product')
     return render(request, 'inventory/package_list.html', {
         'store': store, 'packages': packages,
     })
 
 
+@login_required
 def package_form(request, store_slug, pk=None):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     package = get_object_or_404(Package, pk=pk, store=store) if pk else None
     products = Product.objects.filter(store=store, is_active=True)
 
@@ -141,8 +149,9 @@ def package_form(request, store_slug, pk=None):
     })
 
 
+@login_required
 def stock_overview(request, store_slug):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     products = Product.objects.filter(store=store, is_active=True).order_by('stock_qty')
     low = products.filter(stock_qty__lte=F('reorder_level'), stock_qty__gt=0)
     out = products.filter(stock_qty__lte=0)
@@ -151,8 +160,9 @@ def stock_overview(request, store_slug):
     })
 
 
+@login_required
 def api_products(request, store_slug):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     q = request.GET.get('q', '')
     products = Product.objects.filter(store=store, is_active=True)
     if q:
@@ -165,8 +175,9 @@ def api_products(request, store_slug):
     return JsonResponse(data, safe=False)
 
 
+@login_required
 def api_packages(request, store_slug):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     packages = Package.objects.filter(store=store, is_active=True).prefetch_related('items__product')
     data = [{
         'id': str(p.id), 'name': p.name,

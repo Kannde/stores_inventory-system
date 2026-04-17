@@ -1,4 +1,6 @@
 import uuid
+
+from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
 
@@ -7,11 +9,18 @@ class Store(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200)
     slug = models.SlugField(max_length=220, unique=True, blank=True)
+    owner = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='owned_store',
+        blank=True,
+        null=True,
+    )
     phone = models.CharField(max_length=20, blank=True)
     location = models.CharField(max_length=300, blank=True)
     description = models.TextField(blank=True)
     logo = models.ImageField(upload_to='store_logos/', blank=True, null=True)
-    currency_symbol = models.CharField(max_length=10, default='GH₵')
+    currency_symbol = models.CharField(max_length=10, default='GHS')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -43,6 +52,13 @@ class StoreStaff(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='staff')
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='store_staff_profile',
+        blank=True,
+        null=True,
+    )
     name = models.CharField(max_length=200)
     phone = models.CharField(max_length=20, blank=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='sales')

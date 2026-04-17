@@ -1,3 +1,4 @@
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from core.views import get_store
@@ -35,8 +36,9 @@ def preorder_success(request, store_slug):
     return render(request, 'preorders/preorder_success.html', {'store': store})
 
 
+@login_required
 def preorder_list(request, store_slug):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     status = request.GET.get('status', 'pending')
     preorders = PreOrder.objects.filter(store=store)
     if status != 'all':
@@ -46,14 +48,16 @@ def preorder_list(request, store_slug):
     })
 
 
+@login_required
 def preorder_detail(request, store_slug, pk):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     po = get_object_or_404(PreOrder, pk=pk, store=store)
     return render(request, 'preorders/preorder_detail.html', {'store': store, 'preorder': po})
 
 
+@login_required
 def preorder_status(request, store_slug, pk):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     po = get_object_or_404(PreOrder, pk=pk, store=store)
     if request.method == 'POST':
         new_status = request.POST.get('status')

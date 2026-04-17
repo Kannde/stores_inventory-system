@@ -2,9 +2,12 @@
 {% block title %}Staff - {{ store.name }}{% endblock %}
 {% block topnav %}
 <div class="topnav">
-  <a href="{% url 'core:store_dashboard' store.slug %}" class="back">←</a>
+  <a href="{% url 'core:store_dashboard' store.slug %}" class="back">&larr;</a>
   <h1>Staff</h1>
-  <a href="{% url 'core:staff_add' store.slug %}" class="action">+ Add</a>
+  <div class="topnav-actions">
+    <a href="{% url 'core:staff_add' store.slug %}" class="action">+ Add</a>
+    <a href="{% url 'core:logout' %}" class="action">Logout</a>
+  </div>
 </div>
 {% endblock %}
 {% block content %}
@@ -16,13 +19,18 @@
     </div>
     <div style="flex:1">
       <div class="list-title">{{ m.name }}</div>
-      <div class="list-sub">{{ m.get_role_display }}{% if m.phone %} · {{ m.phone }}{% endif %}</div>
+      <div class="list-sub">
+        {{ m.get_role_display }}
+        {% if m.user %} · {{ m.user.username }}{% endif %}
+        {% if m.phone %} · {{ m.phone }}{% endif %}
+      </div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <span class="badge {% if m.is_active %}badge-success{% else %}badge-danger{% endif %}">
         {{ m.is_active|yesno:"Active,Inactive" }}
       </span>
       <a href="{% url 'core:staff_edit' store.slug m.pk %}" class="btn btn-outline btn-sm">Edit</a>
+      <a href="{% url 'core:staff_toggle' store.slug m.pk %}" class="btn btn-outline btn-sm">Toggle</a>
     </div>
   </div>
   {% empty %}

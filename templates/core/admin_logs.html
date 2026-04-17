@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}Activity Logs — Inventory Stores{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'core:admin_landing' %}" class="back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+  </a>
+  <h1>Activity Logs</h1>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+    {% for log in logs %}
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)">
+      <span class="badge {% if log.action_flag == 1 %}badge-success{% elif log.action_flag == 2 %}badge-info{% else %}badge-danger{% endif %}" style="flex-shrink:0;min-width:52px;text-align:center;margin-top:2px">
+        {% if log.action_flag == 1 %}Add{% elif log.action_flag == 2 %}Change{% else %}Delete{% endif %}
+      </span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500">{{ log.object_repr }}</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:2px">
+          {{ log.content_type|capfirst }}
+          {% if log.change_message %} &middot; {{ log.change_message }}{% endif %}
+        </div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:1px">
+          by <strong>{{ log.user.username }}</strong> &middot; {{ log.action_time|date:"M d Y, H:i" }}
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <p>No activity recorded yet.</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

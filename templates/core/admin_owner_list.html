@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}Owners — Inventory Stores{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'core:admin_landing' %}" class="back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+  </a>
+  <h1>Store Owners</h1>
+  <div class="topnav-actions">
+    <a href="{% url 'core:admin_owner_create' %}" class="action">+ New</a>
+  </div>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+    {% for owner in owners %}
+    <div class="list-item">
+      <div class="list-icon" style="background:var(--info-light);color:var(--info);font-weight:700">
+        {{ owner.username|first|upper }}
+      </div>
+      <div class="list-content">
+        <div class="list-title">{{ owner.get_full_name|default:owner.username }}</div>
+        <div class="list-sub">
+          @{{ owner.username }}
+          {% if owner.email %} &middot; {{ owner.email }}{% endif %}
+          {% if owner.owned_store %} &middot; <span style="color:var(--accent)">{{ owner.owned_store.name }}</span>{% else %} &middot; <span style="color:var(--text-3)">No store</span>{% endif %}
+        </div>
+      </div>
+      <div class="list-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+        <span class="badge {% if owner.is_active %}badge-success{% else %}badge-danger{% endif %}">
+          {% if owner.is_active %}Active{% else %}Inactive{% endif %}
+        </span>
+        <a href="{% url 'core:admin_owner_edit' owner.pk %}" class="btn btn-outline btn-sm">Edit</a>
+      </div>
+    </div>
+    {% empty %}
+    <div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      <p>No owner accounts yet. <a href="{% url 'core:admin_owner_create' %}">Create one.</a></p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

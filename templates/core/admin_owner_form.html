@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }} — Inventory Stores{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'core:admin_owners' %}" class="back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+  </a>
+  <h1>{{ title }}</h1>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <form method="post">
+    {% csrf_token %}
+    {% for field in form %}
+    <div class="form-group">
+      <label class="form-label">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+      {% if field.field.widget.input_type == 'checkbox' %}
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px">
+          {{ field }}
+          <span>{{ field.label }}</span>
+        </label>
+      {% elif field.field.widget.input_type == 'select' %}
+        <select name="{{ field.html_name }}" class="form-select">
+          {% for val, label in field.field.choices %}
+          <option value="{{ val }}" {% if field.value|stringformat:"s" == val|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      {% elif field.field.widget.input_type == 'password' %}
+        <input type="password" name="{{ field.html_name }}" class="form-input" autocomplete="new-password">
+      {% else %}
+        <input type="{{ field.field.widget.input_type }}" name="{{ field.html_name }}" value="{{ field.value|default:'' }}" class="form-input">
+      {% endif %}
+      {% if field.help_text %}
+      <div style="font-size:11px;color:var(--text-3);margin-top:3px">{{ field.help_text }}</div>
+      {% endif %}
+      {% for error in field.errors %}
+      <div style="color:var(--danger);font-size:12px;margin-top:4px">{{ error }}</div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button type="submit" class="btn btn-primary" style="flex:1">Save Owner</button>
+      <a href="{% url 'core:admin_owners' %}" class="btn btn-outline" style="flex:1;text-align:center">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -2,13 +2,34 @@
 {% block title %}{{ store.name }} - Dashboard{% endblock %}
 {% block topnav %}
 <div class="topnav">
-  <a href="{% url 'core:home' %}" class="back">←</a>
+  {% if request.user.is_superuser %}
+  <a href="{% url 'core:admin_landing' %}" class="back">&larr;</a>
+  {% endif %}
   <h1>{{ store.name }}</h1>
-  <a href="{% url 'core:staff_list' store.slug %}" class="action">Staff</a>
+  <div class="topnav-actions">
+    {% if can_edit_store %}<a href="{% url 'core:store_settings' store.slug %}" class="action">Store</a>{% endif %}
+    {% if can_manage_staff %}<a href="{% url 'core:staff_list' store.slug %}" class="action">Staff</a>{% endif %}
+    <a href="{% url 'core:logout' %}" class="action">Logout</a>
+  </div>
 </div>
 {% endblock %}
 {% block content %}
 <div class="container">
+  <div class="card">
+    <div class="card-header" style="margin-bottom:0">
+      <div>
+        <div class="card-title">{{ store.name }}</div>
+        <div style="font-size:13px;color:var(--text-3)">
+          {% if current_role_label %}Signed in as {{ current_role_label }}{% endif %}
+          {% if store.location %} · {{ store.location }}{% endif %}
+        </div>
+      </div>
+      {% if can_edit_store %}
+      <a href="{% url 'core:store_settings' store.slug %}" class="btn btn-outline btn-sm">Edit Store</a>
+      {% endif %}
+    </div>
+  </div>
+
   <div class="stats">
     <div class="stat">
       <div class="stat-label">Today's Revenue</div>
@@ -47,7 +68,6 @@
     </div>
   </div>
 
-  <!-- Quick Actions -->
   <div class="card">
     <div class="card-title" style="margin-bottom:12px">Quick Actions</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -58,7 +78,6 @@
     </div>
   </div>
 
-  <!-- Recent Sales -->
   <div class="card">
     <div class="card-header">
       <span class="card-title">Recent Sales</span>

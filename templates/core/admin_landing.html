@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% block title %}Admin — Inventory Stores{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <h1>Inventory Stores</h1>
+  <div class="topnav-actions">
+    <a href="/admin/" class="action">Django Admin</a>
+    <a href="{% url 'core:logout' %}" class="action" style="color:var(--danger)">Logout</a>
+  </div>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+
+  <!-- Stats -->
+  <div class="stats" style="grid-template-columns:repeat(2,1fr);margin-bottom:20px">
+    <div class="stat">
+      <div class="stat-label">Total Stores</div>
+      <div class="stat-value accent">{{ total_stores }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Active</div>
+      <div class="stat-value accent">{{ active_stores }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Inactive</div>
+      <div class="stat-value warning">{{ inactive_stores }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Owners</div>
+      <div class="stat-value">{{ owner_count }}</div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
+    <a href="{% url 'core:admin_owners' %}" class="btn btn-outline btn-sm">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+      Manage Owners
+    </a>
+    <a href="{% url 'core:admin_logs' %}" class="btn btn-outline btn-sm">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+      Activity Logs
+    </a>
+    <a href="/admin/" class="btn btn-outline btn-sm">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>
+      Django Admin
+    </a>
+  </div>
+
+  <!-- Stores Section -->
+  <div class="card-header" style="margin-bottom:10px">
+    <span class="card-title">Stores</span>
+    <a href="{% url 'core:admin_store_create' %}" class="btn btn-primary btn-sm">+ New Store</a>
+  </div>
+
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px">
+    {% for store in stores %}
+    <div class="list-item" style="flex-direction:column;align-items:stretch;gap:8px;padding:14px 16px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="list-icon" style="background:var(--accent-light);color:var(--accent);font-weight:700;font-size:18px;flex-shrink:0">
+          {{ store.name|first|upper }}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:15px">{{ store.name }}</div>
+          <div style="font-size:12px;color:var(--text-3)">
+            {% if store.owner %}{{ store.owner.get_full_name|default:store.owner.username }}{% else %}<span style="color:var(--warning)">No owner</span>{% endif %}
+            {% if store.location %} &middot; {{ store.location }}{% endif %}
+            &middot; {{ store.staff_count }} staff
+          </div>
+        </div>
+        <span class="badge {% if store.is_active %}badge-success{% else %}badge-danger{% endif %}">
+          {% if store.is_active %}Active{% else %}Inactive{% endif %}
+        </span>
+      </div>
+      <div style="display:flex;gap:6px;padding-left:52px">
+        {% if store.is_active %}
+        <a href="{% url 'core:store_dashboard' store.slug %}" class="btn btn-primary btn-sm">Open</a>
+        {% endif %}
+        <a href="{% url 'core:admin_store_edit' store.pk %}" class="btn btn-outline btn-sm">Edit</a>
+        <form method="post" action="{% url 'core:admin_store_toggle' store.pk %}" style="display:inline">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm {% if store.is_active %}btn-outline{% else %}btn-outline{% endif %}"
+            style="{% if store.is_active %}color:var(--danger);border-color:var(--danger){% else %}color:var(--accent);border-color:var(--accent){% endif %}">
+            {% if store.is_active %}Deactivate{% else %}Activate{% endif %}
+          </button>
+        </form>
+      </div>
+    </div>
+    {% empty %}
+    <div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+      <p>No stores yet. <a href="{% url 'core:admin_store_create' %}">Create your first store.</a></p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Recent Activity -->
+  {% if recent_logs %}
+  <div class="card-header" style="margin-bottom:10px">
+    <span class="card-title">Recent Activity</span>
+    <a href="{% url 'core:admin_logs' %}" style="font-size:13px;color:var(--accent)">View all</a>
+  </div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+    {% for log in recent_logs %}
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)">
+      <span class="badge {% if log.action_flag == 1 %}badge-success{% elif log.action_flag == 2 %}badge-info{% else %}badge-danger{% endif %}" style="flex-shrink:0;min-width:48px;text-align:center">
+        {% if log.action_flag == 1 %}Add{% elif log.action_flag == 2 %}Change{% else %}Delete{% endif %}
+      </span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ log.object_repr }}</div>
+        <div style="font-size:11px;color:var(--text-3)">{{ log.content_type }} &middot; {{ log.user.username }}</div>
+      </div>
+      <div style="font-size:11px;color:var(--text-3);flex-shrink:0">{{ log.action_time|date:"M d, H:i" }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

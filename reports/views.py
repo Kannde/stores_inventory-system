@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.db.models import Sum, Count, F
@@ -9,8 +10,9 @@ from sales.models import Sale, SaleItem
 from inventory.models import Product
 
 
+@login_required
 def dashboard(request, store_slug):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     today = timezone.now().date()
     period = request.GET.get('period', '7')
     days = int(period)
@@ -27,8 +29,9 @@ def dashboard(request, store_slug):
     return render(request, 'reports/dashboard.html', context)
 
 
+@login_required
 def api_sales_chart(request, store_slug):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     days = int(request.GET.get('days', 7))
     today = timezone.now().date()
     data = []
@@ -42,8 +45,9 @@ def api_sales_chart(request, store_slug):
     return JsonResponse(data, safe=False)
 
 
+@login_required
 def api_top_products(request, store_slug):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     days = int(request.GET.get('days', 7))
     start = timezone.now().date() - timedelta(days=days)
     top = SaleItem.objects.filter(

@@ -56,6 +56,7 @@ a { color: var(--accent); text-decoration: none; }
 .topnav .back { font-size: 20px; color: var(--text-2); display: flex; }
 .topnav h1 { font-size: 17px; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topnav .action { color: var(--accent); font-weight: 600; font-size: 14px; }
+.topnav-actions { display: flex; align-items: center; gap: 12px; }
 
 /* BOTTOM NAV */
 .bottomnav {
@@ -194,6 +195,17 @@ a { color: var(--accent); text-decoration: none; }
 /* CONTAINER */
 .container { padding: 16px; max-width: 600px; margin: 0 auto; }
 
+/* ALERTS */
+.alerts { max-width: 600px; margin: 12px auto 0; padding: 0 16px; }
+.alert {
+  padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+  background: var(--surface); margin-bottom: 8px; font-size: 14px;
+}
+.alert.success { background: var(--accent-light); color: var(--accent-dark); border-color: #b7dfbf; }
+.alert.error { background: var(--danger-light); color: var(--danger); border-color: #f6c9ce; }
+.alert.warning { background: var(--warning-light); color: var(--warning); border-color: #f1d7ad; }
+.alert.info { background: var(--info-light); color: var(--info); border-color: #c4d7fb; }
+
 /* EMPTY STATE */
 .empty { text-align: center; padding: 40px 20px; color: var(--text-3); }
 .empty svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: .4; }
@@ -239,6 +251,13 @@ a { color: var(--accent); text-decoration: none; }
 </head>
 <body>
 {% block topnav %}{% endblock %}
+{% if messages %}
+<div class="alerts">
+  {% for message in messages %}
+  <div class="alert {{ message.tags|default:'info' }}">{{ message }}</div>
+  {% endfor %}
+</div>
+{% endif %}
 {% block content %}{% endblock %}
 {% block bottomnav %}{% endblock %}
 {% block scripts %}{% endblock %}

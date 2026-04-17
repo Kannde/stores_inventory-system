@@ -1,41 +1,110 @@
 {% extends 'base.html' %}
-{% block title %}New Sale - {{ store.name }}{% endblock %}
+{% block title %}New Sale — {{ store.name }}{% endblock %}
+
 {% block topnav %}
 <div class="topnav">
-  <a href="{% url 'core:store_dashboard' store.slug %}" class="back">←</a>
+  <a href="{% url 'core:store_dashboard' store.slug %}" class="back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+  </a>
   <h1>New Sale</h1>
 </div>
 {% endblock %}
+
 {% block content %}
+<style>
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+@media (min-width: 480px) { .product-grid { grid-template-columns: repeat(3, 1fr); } }
+.product-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color .15s, transform .1s;
+  position: relative;
+}
+.product-card:active { transform: scale(.97); border-color: var(--accent); }
+.product-card.out-of-stock { opacity: .5; pointer-events: none; }
+.product-img {
+  width: 100%; aspect-ratio: 1/1;
+  object-fit: cover; display: block;
+  background: var(--surface-2);
+}
+.product-img-placeholder {
+  width: 100%; aspect-ratio: 1/1;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-light);
+  font-size: 28px; font-weight: 700; color: var(--accent);
+}
+.product-info { padding: 8px 10px 10px; }
+.product-name { font-size: 13px; font-weight: 600; line-height: 1.3; margin-bottom: 4px; }
+.product-price { font-size: 14px; font-weight: 700; color: var(--accent); }
+.product-stock { font-size: 11px; color: var(--text-3); }
+.pkg-card {
+  background: var(--surface);
+  border: 1.5px solid var(--info-light);
+  border-radius: var(--radius);
+  padding: 12px;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 8px;
+  transition: border-color .15s, transform .1s;
+}
+.pkg-card:active { transform: scale(.98); border-color: var(--info); }
+.section-label {
+  font-size: 12px; font-weight: 600; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: .5px;
+  margin: 16px 0 8px;
+}
+#noResults { display: none; }
+</style>
+
 <div class="container" style="padding-bottom:200px">
+
   <!-- Search -->
-  <div class="search-bar">
+  <div class="search-bar" style="margin-bottom:14px">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input type="search" id="searchInput" placeholder="Search products or packages..." autocomplete="off">
+    <input type="search" id="searchInput" placeholder="Search products..." autocomplete="off" style="padding-left:40px">
   </div>
-  <div id="searchResults" style="display:none" class="card"></div>
+
+  <!-- Products -->
+  <div id="catalogSection">
+    <div class="section-label" id="productsLabel">Products</div>
+    <div class="product-grid" id="productGrid"></div>
+
+    <div class="section-label" id="packagesLabel">Packages</div>
+    <div id="packageList"></div>
+
+    <div id="noResults" class="empty" style="padding:24px 0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <p>No matching products</p>
+    </div>
+  </div>
 
   <!-- Cart -->
-  <div class="card">
+  <div class="card" style="margin-top:4px">
     <div class="card-header">
       <span class="card-title">Cart</span>
       <span id="cartCount" style="font-size:13px;color:var(--text-3)">0 items</span>
     </div>
     <div id="cartItems">
-      <div class="empty" id="emptyCart"><p>Add products to begin</p></div>
+      <div class="empty"><p>Add products to begin</p></div>
     </div>
   </div>
 
-  <!-- Totals & Checkout (sticky bottom) -->
+  <!-- Sticky checkout bar -->
   <div id="checkoutBar" style="display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:12px 16px calc(12px + env(safe-area-inset-bottom,0));z-index:95;box-shadow:0 -2px 10px rgba(0,0,0,.08)">
     <div style="max-width:600px;margin:0 auto">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <span style="font-size:14px;color:var(--text-2)">Total</span>
         <span id="totalAmount" style="font-size:22px;font-weight:700;color:var(--accent)">{{ store.currency_symbol }}0.00</span>
       </div>
-      <button type="button" class="btn btn-primary btn-block" onclick="openCheckout()" style="height:48px;font-size:16px">
-        Checkout
-      </button>
+      <button type="button" class="btn btn-primary btn-block" onclick="openCheckout()" style="height:48px;font-size:16px">Checkout</button>
     </div>
   </div>
 </div>
@@ -45,22 +114,17 @@
   <div class="modal-sheet">
     <div class="modal-handle"></div>
     <h2 style="font-size:18px;font-weight:600;margin-bottom:16px">Checkout</h2>
-
     <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)">
       <span style="font-size:16px">Total</span>
       <span id="modalTotal" style="font-size:20px;font-weight:700;color:var(--accent)"></span>
     </div>
-
     <div class="form-group" style="margin-top:14px">
       <label class="form-label">Sales Person</label>
       <select id="staffSelect" class="form-select">
         <option value="">-- Select --</option>
-        {% for s in staff %}
-        <option value="{{ s.id }}">{{ s.name }}</option>
-        {% endfor %}
+        {% for s in staff %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
       </select>
     </div>
-
     <div class="form-group">
       <label class="form-label">Payment Method</label>
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
@@ -70,22 +134,18 @@
         <button type="button" class="pay-method btn btn-outline" data-method="credit" onclick="selectPay(this)">Credit</button>
       </div>
     </div>
-
     <div class="form-group">
       <label class="form-label">Amount Received</label>
       <input type="number" id="amountPaid" class="form-input" step="0.01" inputmode="decimal" style="font-size:20px;font-weight:600;text-align:center">
     </div>
-
     <div id="changeDisplay" style="display:none;text-align:center;padding:10px;background:var(--accent-light);border-radius:var(--radius-sm);margin-bottom:12px">
       <div style="font-size:12px;color:var(--accent-dark)">Change</div>
       <div id="changeAmount" style="font-size:22px;font-weight:700;color:var(--accent-dark)"></div>
     </div>
-
     <div class="form-group">
       <label class="form-label">Notes</label>
       <input type="text" id="saleNotes" class="form-input" placeholder="Optional">
     </div>
-
     <div style="display:flex;gap:8px;margin-top:8px">
       <button type="button" class="btn btn-outline" style="flex:1" onclick="closeCheckout()">Cancel</button>
       <button type="button" class="btn btn-primary" style="flex:2" id="confirmBtn" onclick="completeSale()">Complete Sale</button>
@@ -97,7 +157,9 @@
 <div class="modal-overlay" id="receiptModal">
   <div class="modal-sheet" style="text-align:center">
     <div class="modal-handle"></div>
-    <div style="font-size:48px;margin-bottom:8px">✓</div>
+    <div style="width:56px;height:56px;border-radius:50%;background:var(--accent-light);display:flex;align-items:center;justify-content:center;margin:0 auto 12px">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
     <h2 style="font-size:20px;font-weight:600;color:var(--accent)">Sale Complete</h2>
     <div id="receiptNumber" style="font-size:14px;color:var(--text-3);margin-top:4px"></div>
     <div id="receiptTotal" style="font-size:28px;font-weight:700;margin:16px 0"></div>
@@ -114,61 +176,90 @@
 <script>
 const STORE_SLUG = '{{ store.slug }}';
 const CURRENCY = '{{ store.currency_symbol }}';
+const ALL_PRODUCTS = {{ products_json|safe }};
+const ALL_PACKAGES = {{ packages_json|safe }};
+
 let cart = [];
 let payMethod = 'cash';
-let searchTimeout;
 
-// Search
-const searchInput = document.getElementById('searchInput');
-const searchResults = document.getElementById('searchResults');
-
-searchInput.addEventListener('input', function() {
-  clearTimeout(searchTimeout);
-  const q = this.value.trim();
-  if (q.length < 1) { searchResults.style.display = 'none'; return; }
-  searchTimeout = setTimeout(() => doSearch(q), 250);
-});
-
-async function doSearch(q) {
-  const [prodRes, pkgRes] = await Promise.all([
-    fetch(`/s/${STORE_SLUG}/api/products/?q=${encodeURIComponent(q)}`),
-    fetch(`/s/${STORE_SLUG}/api/packages/`)
-  ]);
-  const products = await prodRes.json();
-  const packages = (await pkgRes.json()).filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
-
-  let html = '';
-  products.forEach(p => {
-    html += `<div class="list-item" style="cursor:pointer" onclick="addProduct(${JSON.stringify(p).replace(/"/g,'&quot;')})">
-      <div class="list-content">
-        <div class="list-title">${p.name}</div>
-        <div class="list-sub">${p.stock_qty} in stock · ${p.unit_label}</div>
-      </div>
-      <div style="font-weight:600;color:var(--accent)">${CURRENCY}${parseFloat(p.unit_price).toFixed(2)}</div>
-    </div>`;
-  });
-  packages.forEach(p => {
-    const items = p.items.map(i => `${i.qty}× ${i.product}`).join(', ');
-    html += `<div class="list-item" style="cursor:pointer" onclick="addPackage(${JSON.stringify(p).replace(/"/g,'&quot;')})">
-      <div class="list-content">
-        <div class="list-title"><span class="badge badge-info" style="margin-right:4px">PKG</span>${p.name}</div>
-        <div class="list-sub">${items}</div>
-      </div>
-      <div style="font-weight:600;color:var(--accent)">${CURRENCY}${parseFloat(p.package_price).toFixed(2)}</div>
-    </div>`;
-  });
-  if (!html) html = '<div class="empty" style="padding:16px"><p>No results</p></div>';
-  searchResults.innerHTML = html;
-  searchResults.style.display = 'block';
+// ── Catalog rendering ──────────────────────────────────────
+function escAttr(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+function renderCatalog(query) {
+  const q = (query || '').toLowerCase().trim();
+  const products = q
+    ? ALL_PRODUCTS.filter(p => p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q)))
+    : ALL_PRODUCTS;
+  const packages = q
+    ? ALL_PACKAGES.filter(p => p.name.toLowerCase().includes(q))
+    : ALL_PACKAGES;
+
+  const grid = document.getElementById('productGrid');
+  const pkgList = document.getElementById('packageList');
+  const noResults = document.getElementById('noResults');
+  const productsLabel = document.getElementById('productsLabel');
+  const packagesLabel = document.getElementById('packagesLabel');
+
+  // Products grid
+  if (products.length === 0) {
+    grid.innerHTML = '';
+    productsLabel.style.display = 'none';
+  } else {
+    productsLabel.style.display = '';
+    grid.innerHTML = products.map(p => {
+      const outOfStock = p.stock_qty <= 0;
+      const imgHtml = p.image_url
+        ? `<img src="${escAttr(p.image_url)}" class="product-img" alt="${escAttr(p.name)}" loading="lazy">`
+        : `<div class="product-img-placeholder">${escAttr(p.name.charAt(0).toUpperCase())}</div>`;
+      const data = escAttr(JSON.stringify(p));
+      return `<div class="product-card${outOfStock ? ' out-of-stock' : ''}" onclick='addProduct(${JSON.stringify(p)})'>
+        ${imgHtml}
+        <div class="product-info">
+          <div class="product-name">${escAttr(p.name)}</div>
+          <div class="product-price">${CURRENCY}${parseFloat(p.unit_price).toFixed(2)}</div>
+          <div class="product-stock">${outOfStock ? 'Out of stock' : p.stock_qty + ' ' + escAttr(p.unit_label)}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Packages list
+  if (packages.length === 0) {
+    pkgList.innerHTML = '';
+    packagesLabel.style.display = 'none';
+  } else {
+    packagesLabel.style.display = '';
+    pkgList.innerHTML = packages.map(p => {
+      const items = p.items.map(i => `${i.qty}× ${i.product}`).join(', ');
+      return `<div class="pkg-card" onclick='addPackage(${JSON.stringify(p)})'>
+        <div style="width:40px;height:40px;border-radius:10px;background:var(--info-light);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600">${escAttr(p.name)}</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:2px">${escAttr(items)}</div>
+        </div>
+        <div style="font-weight:700;color:var(--info);flex-shrink:0">${CURRENCY}${parseFloat(p.package_price).toFixed(2)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  noResults.style.display = (products.length === 0 && packages.length === 0) ? 'block' : 'none';
+}
+
+// ── Search ────────────────────────────────────────────────
+document.getElementById('searchInput').addEventListener('input', function() {
+  renderCatalog(this.value);
+});
+
+// ── Cart ──────────────────────────────────────────────────
 function addProduct(p) {
   const existing = cart.find(i => i.id === p.id && i.type === 'product');
   if (existing) { existing.quantity++; }
   else { cart.push({ id: p.id, name: p.name, unit_price: parseFloat(p.unit_price), quantity: 1, type: 'product' }); }
   renderCart();
-  searchInput.value = '';
-  searchResults.style.display = 'none';
 }
 
 function addPackage(p) {
@@ -176,8 +267,6 @@ function addPackage(p) {
   if (existing) { existing.quantity++; }
   else { cart.push({ id: p.id, name: p.name, unit_price: parseFloat(p.package_price), quantity: 1, type: 'package' }); }
   renderCart();
-  searchInput.value = '';
-  searchResults.style.display = 'none';
 }
 
 function updateQty(idx, delta) {
@@ -186,19 +275,13 @@ function updateQty(idx, delta) {
   renderCart();
 }
 
-function removeItem(idx) {
-  cart.splice(idx, 1);
-  renderCart();
-}
+function removeItem(idx) { cart.splice(idx, 1); renderCart(); }
 
-function getTotal() {
-  return cart.reduce((s, i) => s + i.unit_price * i.quantity, 0);
-}
+function getTotal() { return cart.reduce((s, i) => s + i.unit_price * i.quantity, 0); }
 
 function renderCart() {
   const container = document.getElementById('cartItems');
   const bar = document.getElementById('checkoutBar');
-  const empty = document.getElementById('emptyCart');
 
   if (cart.length === 0) {
     container.innerHTML = '<div class="empty"><p>Add products to begin</p></div>';
@@ -213,7 +296,7 @@ function renderCart() {
     html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
       <div style="flex:1;min-width:0">
         <div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-          ${item.type === 'package' ? '<span class="badge badge-info" style="margin-right:4px;font-size:9px">PKG</span>' : ''}${item.name}
+          ${item.type === 'package' ? '<span class="badge badge-info" style="margin-right:4px;font-size:9px">PKG</span>' : ''}${escAttr(item.name)}
         </div>
         <div style="font-size:12px;color:var(--text-3)">${CURRENCY}${item.unit_price.toFixed(2)} each</div>
       </div>
@@ -234,7 +317,7 @@ function renderCart() {
   bar.style.display = 'block';
 }
 
-// Checkout
+// ── Checkout ──────────────────────────────────────────────
 function selectPay(el) {
   document.querySelectorAll('.pay-method').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
@@ -249,43 +332,34 @@ function openCheckout() {
   updateChange();
 }
 
-function closeCheckout() {
-  document.getElementById('checkoutModal').classList.remove('open');
-}
+function closeCheckout() { document.getElementById('checkoutModal').classList.remove('open'); }
 
 document.getElementById('amountPaid').addEventListener('input', updateChange);
 
 function updateChange() {
   const paid = parseFloat(document.getElementById('amountPaid').value) || 0;
-  const total = getTotal();
-  const change = paid - total;
+  const change = paid - getTotal();
   const el = document.getElementById('changeDisplay');
   if (change > 0) {
     el.style.display = 'block';
     document.getElementById('changeAmount').textContent = CURRENCY + change.toFixed(2);
-  } else {
-    el.style.display = 'none';
-  }
+  } else { el.style.display = 'none'; }
 }
 
 async function completeSale() {
   const btn = document.getElementById('confirmBtn');
-  btn.disabled = true;
-  btn.textContent = 'Processing...';
-
-  const body = {
-    items: cart,
-    staff_id: document.getElementById('staffSelect').value || null,
-    payment_method: payMethod,
-    amount_paid: parseFloat(document.getElementById('amountPaid').value) || 0,
-    notes: document.getElementById('saleNotes').value,
-  };
-
+  btn.disabled = true; btn.textContent = 'Processing...';
   try {
     const res = await fetch(`/s/${STORE_SLUG}/sales/api/checkout/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        items: cart,
+        staff_id: document.getElementById('staffSelect').value || null,
+        payment_method: payMethod,
+        amount_paid: parseFloat(document.getElementById('amountPaid').value) || 0,
+        notes: document.getElementById('saleNotes').value,
+      }),
     });
     const data = await res.json();
     if (data.success) {
@@ -298,33 +372,26 @@ async function completeSale() {
       }
       document.getElementById('receiptLink').href = `/s/${STORE_SLUG}/sales/${data.sale_id}/receipt/`;
       document.getElementById('receiptModal').classList.add('open');
-    } else {
-      alert(data.error || 'Error processing sale');
-    }
-  } catch (e) {
-    alert('Network error');
-  }
-  btn.disabled = false;
-  btn.textContent = 'Complete Sale';
+    } else { alert(data.error || 'Error processing sale'); }
+  } catch (e) { alert('Network error'); }
+  btn.disabled = false; btn.textContent = 'Complete Sale';
 }
 
 function newSale() {
-  cart = [];
-  renderCart();
+  cart = []; renderCart();
   document.getElementById('receiptModal').classList.remove('open');
   document.getElementById('receiptChange').style.display = 'none';
 }
 
-// Close modals on overlay click
 document.querySelectorAll('.modal-overlay').forEach(el => {
-  el.addEventListener('click', function(e) {
-    if (e.target === this) this.classList.remove('open');
-  });
+  el.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
 });
 
-// Style for active payment button
 const style = document.createElement('style');
 style.textContent = '.pay-method.active{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}';
 document.head.appendChild(style);
+
+// Initial render
+renderCatalog('');
 </script>
 {% endblock %}

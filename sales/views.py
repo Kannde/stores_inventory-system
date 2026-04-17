@@ -1,4 +1,5 @@
 import json
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -10,34 +11,64 @@ from inventory.models import Product, Package, StockMovement
 from .models import Sale, SaleItem
 
 
+@login_required
 def sale_list(request, store_slug):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     sales = Sale.objects.filter(store=store).select_related('staff')[:50]
     return render(request, 'sales/sale_list.html', {'store': store, 'sales': sales})
 
 
+@login_required
 def new_sale(request, store_slug):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     staff = StoreStaff.objects.filter(store=store, is_active=True, role__in=['sales', 'manager'])
-    return render(request, 'sales/new_sale.html', {'store': store, 'staff': staff})
+
+    products = Product.objects.filter(store=store, is_active=True).prefetch_related('images').order_by('name')
+    packages = Package.objects.filter(store=store, is_active=True).prefetch_related('items__product').order_by('name')
+
+    products_data = []
+    for p in products:
+        first_img = p.images.first()
+        products_data.append({
+            'id': str(p.id), 'name': p.name, 'sku': p.sku,
+            'unit_price': str(p.unit_price), 'stock_qty': p.stock_qty,
+            'unit_label': p.unit_label,
+            'image_url': first_img.image.url if first_img else None,
+        })
+
+    packages_data = [{
+        'id': str(p.id), 'name': p.name,
+        'package_price': str(p.package_price),
+        'items': [{'product': i.product.name, 'qty': i.quantity} for i in p.items.all()],
+    } for p in packages]
+
+    return render(request, 'sales/new_sale.html', {
+        'store': store,
+        'staff': staff,
+        'products_json': json.dumps(products_data),
+        'packages_json': json.dumps(packages_data),
+    })
 
 
+@login_required
 def sale_detail(request, store_slug, pk):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     sale = get_object_or_404(Sale, pk=pk, store=store)
     return render(request, 'sales/sale_detail.html', {'store': store, 'sale': sale})
 
 
+@login_required
 def sale_receipt(request, store_slug, pk):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     sale = get_object_or_404(Sale, pk=pk, store=store)
     return render(request, 'sales/receipt.html', {'store': store, 'sale': sale})
 
 
+@login_required
 @csrf_exempt
 @require_POST
 def api_checkout(request, store_slug):
-    store = get_store(store_slug)
+    store = get_store(store_slug, request.user)
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
