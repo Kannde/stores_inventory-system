@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}Suppliers — {{ store.name }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'core:store_dashboard' store.slug %}" class="back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+  </a>
+  <h1>Suppliers</h1>
+  <div class="topnav-actions">
+    <a href="{% url 'inventory:supplier_add' store.slug %}" class="action">+ Add</a>
+  </div>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+
+  <!-- Financial summary -->
+  <div class="stats" style="grid-template-columns:repeat(2,1fr);margin-bottom:20px">
+    <div class="stat">
+      <div class="stat-label">Total Owed to Suppliers</div>
+      <div class="stat-value danger">{{ store.currency_symbol }}{{ total_owed|floatformat:2 }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Total Invested in Own Suppliers</div>
+      <div class="stat-value accent">{{ store.currency_symbol }}{{ total_invested|floatformat:2 }}</div>
+    </div>
+  </div>
+
+  <!-- Supplier list -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+    {% for s in suppliers %}
+    <div class="list-item" style="flex-direction:column;align-items:stretch;gap:6px;padding:14px 16px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="list-icon" style="background:{% if s.ownership == 'store_owned' %}var(--accent-light);color:var(--accent){% else %}var(--info-light);color:var(--info){% endif %};font-weight:700;flex-shrink:0">
+          {{ s.name|first|upper }}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:15px">{{ s.name }}</div>
+          <div style="font-size:12px;color:var(--text-3)">
+            {% if s.contact_person %}{{ s.contact_person }}{% endif %}
+            {% if s.phone %} · {{ s.phone }}{% endif %}
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <span class="badge {% if s.ownership == 'store_owned' %}badge-success{% else %}badge-info{% endif %}">
+            {% if s.ownership == 'store_owned' %}Owned{% else %}External{% endif %}
+          </span>
+          <div style="font-size:13px;font-weight:700;margin-top:4px;{% if s.outstanding_balance > 0 %}color:var(--danger){% else %}color:var(--accent){% endif %}">
+            {{ store.currency_symbol }}{{ s.outstanding_balance|floatformat:2 }}
+          </div>
+          <div style="font-size:10px;color:var(--text-3)">
+            {% if s.ownership == 'store_owned' %}invested{% else %}outstanding{% endif %}
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;padding-left:52px">
+        <a href="{% url 'inventory:supplier_detail' store.slug s.pk %}" class="btn btn-primary btn-sm">View</a>
+        <a href="{% url 'inventory:supplier_edit' store.slug s.pk %}" class="btn btn-outline btn-sm">Edit</a>
+        <form method="post" action="{% url 'inventory:supplier_toggle' store.slug s.pk %}" style="display:inline">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-outline" style="{% if s.is_active %}color:var(--danger);border-color:var(--danger){% else %}color:var(--accent);border-color:var(--accent){% endif %}">
+            {% if s.is_active %}Deactivate{% else %}Activate{% endif %}
+          </button>
+        </form>
+      </div>
+    </div>
+    {% empty %}
+    <div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 3H8a2 2 0 00-2 2v2h12V5a2 2 0 00-2-2z"/></svg>
+      <p>No suppliers yet. <a href="{% url 'inventory:supplier_add' store.slug %}">Add your first supplier.</a></p>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+{% endblock %}

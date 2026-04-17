@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Product, ProductImage, Package, PackageItem, StockMovement
+from .models import Category, Product, ProductImage, Package, PackageItem, StockMovement, Supplier, SupplierTransaction
 
 
 class ProductImageInline(admin.TabularInline):
@@ -38,3 +38,17 @@ class StockMovementAdmin(admin.ModelAdmin):
     list_display = ['product', 'movement_type', 'quantity', 'reason', 'created_at']
     list_filter = ['movement_type', 'product__store']
     search_fields = ['product__name', 'reason']
+
+
+class SupplierTransactionInline(admin.TabularInline):
+    model = SupplierTransaction
+    extra = 0
+    readonly_fields = ['created_at']
+
+
+@admin.register(Supplier)
+class SupplierAdmin(admin.ModelAdmin):
+    list_display = ['name', 'store', 'ownership', 'outstanding_balance', 'phone', 'is_active']
+    list_filter = ['store', 'ownership', 'is_active']
+    search_fields = ['name', 'contact_person', 'phone']
+    inlines = [SupplierTransactionInline]

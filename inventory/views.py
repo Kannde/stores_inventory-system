@@ -1,10 +1,12 @@
 import json
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
-from django.db.models import F, Q
+from django.utils.timezone import now
+from django.db.models import F, Q, Sum
 from core.views import get_store
-from .models import Category, Product, ProductImage, Package, PackageItem, StockMovement
+from .models import Category, Product, ProductImage, Package, PackageItem, StockMovement, Supplier, SupplierTransaction
 
 
 @login_required
@@ -29,6 +31,7 @@ def product_form(request, store_slug, pk=None):
     store = get_store(store_slug, request.user)
     product = get_object_or_404(Product, pk=pk, store=store) if pk else None
     categories = Category.objects.filter(store=store)
+    suppliers = Supplier.objects.filter(store=store, is_active=True)
 
     if request.method == 'POST':
         data = request.POST
@@ -44,16 +47,17 @@ def product_form(request, store_slug, pk=None):
         product.reorder_level = data.get('reorder_level', 5) or 5
         cat_id = data.get('category')
         product.category_id = cat_id if cat_id else None
+        sup_id = data.get('supplier')
+        product.supplier_id = sup_id if sup_id else None
         product.save()
 
-        # Handle images
         for f in request.FILES.getlist('images'):
             ProductImage.objects.create(product=product, image=f)
 
         return redirect('inventory:product_list', store_slug=store.slug)
 
     return render(request, 'inventory/product_form.html', {
-        'store': store, 'product': product, 'categories': categories,
+        'store': store, 'product': product, 'categories': categories, 'suppliers': suppliers,
     })
 
 
@@ -173,6 +177,81 @@ def api_products(request, store_slug):
         'unit_label': p.unit_label,
     } for p in products[:50]]
     return JsonResponse(data, safe=False)
+
+
+@login_required
+def supplier_list(request, store_slug):
+    store = get_store(store_slug, request.user)
+    suppliers = Supplier.objects.filter(store=store)
+    total_owed = suppliers.filter(ownership='external').aggregate(t=Sum('outstanding_balance'))['t'] or 0
+    total_invested = suppliers.filter(ownership='store_owned').aggregate(t=Sum('outstanding_balance'))['t'] or 0
+    return render(request, 'inventory/supplier_list.html', {
+        'store': store, 'suppliers': suppliers,
+        'total_owed': total_owed, 'total_invested': total_invested,
+    })
+
+
+@login_required
+def supplier_form(request, store_slug, pk=None):
+    store = get_store(store_slug, request.user)
+    supplier = get_object_or_404(Supplier, pk=pk, store=store) if pk else None
+
+    if request.method == 'POST':
+        data = request.POST
+        if supplier is None:
+            supplier = Supplier(store=store)
+        supplier.name = data['name']
+        supplier.contact_person = data.get('contact_person', '')
+        supplier.phone = data.get('phone', '')
+        supplier.email = data.get('email', '')
+        supplier.address = data.get('address', '')
+        supplier.notes = data.get('notes', '')
+        supplier.ownership = data.get('ownership', 'external')
+        supplier.save()
+        messages.success(request, f'Supplier "{supplier.name}" saved.')
+        return redirect('inventory:supplier_detail', store_slug=store.slug, pk=supplier.pk)
+
+    return render(request, 'inventory/supplier_form.html', {
+        'store': store, 'supplier': supplier,
+    })
+
+
+@login_required
+def supplier_detail(request, store_slug, pk):
+    store = get_store(store_slug, request.user)
+    supplier = get_object_or_404(Supplier, pk=pk, store=store)
+    transactions = supplier.transactions.all()[:50]
+    return render(request, 'inventory/supplier_detail.html', {
+        'store': store, 'supplier': supplier, 'transactions': transactions,
+        'today': now().date(),
+    })
+
+
+@login_required
+def supplier_transact(request, store_slug, pk):
+    store = get_store(store_slug, request.user)
+    supplier = get_object_or_404(Supplier, pk=pk, store=store)
+
+    if request.method == 'POST':
+        tx_type = request.POST['tx_type']
+        amount = request.POST['amount']
+        description = request.POST.get('description', '')
+        date = request.POST.get('date') or now().date()
+        SupplierTransaction.objects.create(
+            supplier=supplier, tx_type=tx_type,
+            amount=amount, description=description, date=date,
+        )
+        messages.success(request, 'Transaction recorded.')
+    return redirect('inventory:supplier_detail', store_slug=store.slug, pk=pk)
+
+
+@login_required
+def supplier_toggle(request, store_slug, pk):
+    store = get_store(store_slug, request.user)
+    supplier = get_object_or_404(Supplier, pk=pk, store=store)
+    supplier.is_active = not supplier.is_active
+    supplier.save(update_fields=['is_active'])
+    return redirect('inventory:supplier_list', store_slug=store.slug)
 
 
 @login_required

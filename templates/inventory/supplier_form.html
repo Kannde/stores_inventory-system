@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block title %}{% if supplier %}Edit{% else %}New{% endif %} Supplier — {{ store.name }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'inventory:supplier_list' store.slug %}" class="back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+  </a>
+  <h1>{% if supplier %}Edit Supplier{% else %}New Supplier{% endif %}</h1>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="form-group">
+      <label class="form-label">Supplier Name *</label>
+      <input type="text" name="name" class="form-input" value="{{ supplier.name|default:'' }}" required>
+    </div>
+
+    <!-- Ownership type — the key feature -->
+    <div class="form-group">
+      <label class="form-label">Relationship *</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <label style="cursor:pointer">
+          <input type="radio" name="ownership" value="external" {% if not supplier or supplier.ownership == 'external' %}checked{% endif %} style="display:none" onchange="setOwnership(this)">
+          <div class="ownership-card" id="card-external" style="border:2px solid var(--info);border-radius:var(--radius);padding:14px;text-align:center;transition:.15s">
+            <div style="font-size:22px;margin-bottom:6px">🏭</div>
+            <div style="font-weight:600;font-size:13px">External Supplier</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:4px">They supply to you. You owe them money.</div>
+          </div>
+        </label>
+        <label style="cursor:pointer">
+          <input type="radio" name="ownership" value="store_owned" {% if supplier.ownership == 'store_owned' %}checked{% endif %} style="display:none" onchange="setOwnership(this)">
+          <div class="ownership-card" id="card-store_owned" style="border:2px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;transition:.15s">
+            <div style="font-size:22px;margin-bottom:6px">🏢</div>
+            <div style="font-weight:600;font-size:13px">Store-Owned</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:4px">You own this supplier. Track your investment.</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Contact Person</label>
+      <input type="text" name="contact_person" class="form-input" value="{{ supplier.contact_person|default:'' }}">
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group">
+        <label class="form-label">Phone</label>
+        <input type="tel" name="phone" class="form-input" value="{{ supplier.phone|default:'' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" name="email" class="form-input" value="{{ supplier.email|default:'' }}">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Address</label>
+      <textarea name="address" class="form-textarea" rows="2">{{ supplier.address|default:'' }}</textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Notes</label>
+      <textarea name="notes" class="form-textarea" rows="3">{{ supplier.notes|default:'' }}</textarea>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button type="submit" class="btn btn-primary" style="flex:1">Save Supplier</button>
+      <a href="{% url 'inventory:supplier_list' store.slug %}" class="btn btn-outline" style="flex:1;text-align:center">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function setOwnership(radio) {
+  document.querySelectorAll('.ownership-card').forEach(c => {
+    c.style.borderColor = 'var(--border)';
+    c.style.background = 'var(--surface)';
+  });
+  const card = document.getElementById('card-' + radio.value);
+  card.style.borderColor = radio.value === 'store_owned' ? 'var(--accent)' : 'var(--info)';
+  card.style.background = radio.value === 'store_owned' ? 'var(--accent-light)' : 'var(--info-light)';
+}
+// Set initial state
+document.querySelectorAll('input[name="ownership"]').forEach(r => { if (r.checked) setOwnership(r); });
+</script>
+{% endblock %}

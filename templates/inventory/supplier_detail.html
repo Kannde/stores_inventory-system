@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+{% block title %}{{ supplier.name }} — {{ store.name }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'inventory:supplier_list' store.slug %}" class="back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+  </a>
+  <h1>{{ supplier.name }}</h1>
+  <div class="topnav-actions">
+    <a href="{% url 'inventory:supplier_edit' store.slug supplier.pk %}" class="action">Edit</a>
+  </div>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+
+  <!-- Supplier info card -->
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <div class="list-icon" style="width:48px;height:48px;font-size:20px;font-weight:700;background:{% if supplier.ownership == 'store_owned' %}var(--accent-light);color:var(--accent){% else %}var(--info-light);color:var(--info){% endif %}">
+        {{ supplier.name|first|upper }}
+      </div>
+      <div>
+        <div style="font-weight:600;font-size:16px">{{ supplier.name }}</div>
+        <span class="badge {% if supplier.ownership == 'store_owned' %}badge-success{% else %}badge-info{% endif %}">
+          {% if supplier.ownership == 'store_owned' %}Store-Owned{% else %}External Supplier{% endif %}
+        </span>
+      </div>
+    </div>
+    {% if supplier.contact_person or supplier.phone or supplier.email or supplier.address %}
+    <div style="font-size:13px;color:var(--text-2);display:flex;flex-direction:column;gap:4px">
+      {% if supplier.contact_person %}<span>👤 {{ supplier.contact_person }}</span>{% endif %}
+      {% if supplier.phone %}<span>📞 {{ supplier.phone }}</span>{% endif %}
+      {% if supplier.email %}<span>✉ {{ supplier.email }}</span>{% endif %}
+      {% if supplier.address %}<span>📍 {{ supplier.address }}</span>{% endif %}
+    </div>
+    {% endif %}
+    {% if supplier.notes %}
+    <div style="margin-top:10px;font-size:13px;color:var(--text-3);border-top:1px solid var(--border);padding-top:10px">{{ supplier.notes }}</div>
+    {% endif %}
+  </div>
+
+  <!-- Financial summary -->
+  <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
+    <div class="stat">
+      <div class="stat-label">{% if supplier.ownership == 'store_owned' %}Invested{% else %}Purchased{% endif %}</div>
+      <div class="stat-value" style="font-size:17px">{{ store.currency_symbol }}{{ supplier.total_purchased|floatformat:2 }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">{% if supplier.ownership == 'store_owned' %}Returned{% else %}Paid{% endif %}</div>
+      <div class="stat-value accent" style="font-size:17px">{{ store.currency_symbol }}{{ supplier.total_paid|floatformat:2 }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">{% if supplier.ownership == 'store_owned' %}Net Invested{% else %}Outstanding{% endif %}</div>
+      <div class="stat-value {% if supplier.outstanding_balance > 0 %}{% if supplier.ownership == 'store_owned' %}accent{% else %}danger{% endif %}{% endif %}" style="font-size:17px">
+        {{ store.currency_symbol }}{{ supplier.outstanding_balance|floatformat:2 }}
+      </div>
+    </div>
+  </div>
+
+  <!-- Record transaction button -->
+  <button type="button" class="btn btn-primary btn-block" style="margin-bottom:16px" onclick="document.getElementById('txModal').classList.add('open')">
+    + Record Transaction
+  </button>
+
+  <!-- Transaction history -->
+  <div class="card-header" style="margin-bottom:8px">
+    <span class="card-title">Transaction History</span>
+  </div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+    {% for tx in transactions %}
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)">
+      <span class="badge {% if tx.tx_type == 'purchase' or tx.tx_type == 'investment' %}badge-warning{% elif tx.tx_type == 'payment' or tx.tx_type == 'dividend' %}badge-success{% else %}badge-info{% endif %}" style="min-width:72px;text-align:center;flex-shrink:0">
+        {{ tx.get_tx_type_display }}
+      </span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500">{% if tx.description %}{{ tx.description }}{% else %}<span style="color:var(--text-3)">No description</span>{% endif %}</div>
+        <div style="font-size:11px;color:var(--text-3)">{{ tx.date }}</div>
+      </div>
+      <div style="font-weight:700;flex-shrink:0;{% if tx.tx_type == 'purchase' or tx.tx_type == 'investment' %}color:var(--danger){% else %}color:var(--accent){% endif %}">
+        {% if tx.tx_type == 'purchase' or tx.tx_type == 'investment' %}+{% else %}−{% endif %}{{ store.currency_symbol }}{{ tx.amount|floatformat:2 }}
+      </div>
+    </div>
+    {% empty %}
+    <div class="empty"><p>No transactions recorded yet.</p></div>
+    {% endfor %}
+  </div>
+
+  <!-- Products from this supplier -->
+  {% if supplier.products.exists %}
+  <div class="card-header" style="margin:16px 0 8px">
+    <span class="card-title">Products from this Supplier</span>
+  </div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+    {% for p in supplier.products.all %}
+    <div class="list-item">
+      <div class="list-content">
+        <div class="list-title">{{ p.name }}</div>
+        <div class="list-sub">{{ p.stock_qty }} {{ p.unit_label }} in stock</div>
+      </div>
+      <div style="font-weight:600;color:var(--accent)">{{ store.currency_symbol }}{{ p.unit_price }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Transaction Modal -->
+<div class="modal-overlay" id="txModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <h2 style="font-size:18px;font-weight:600;margin-bottom:16px">Record Transaction</h2>
+    <form method="post" action="{% url 'inventory:supplier_transact' store.slug supplier.pk %}">
+      {% csrf_token %}
+
+      <div class="form-group">
+        <label class="form-label">Type *</label>
+        {% if supplier.ownership == 'external' %}
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px" id="txTypeGrid">
+          <button type="button" class="tx-btn btn btn-outline active" data-val="purchase" onclick="setTx(this)">Purchase</button>
+          <button type="button" class="tx-btn btn btn-outline" data-val="payment" onclick="setTx(this)">Payment</button>
+          <button type="button" class="tx-btn btn btn-outline" data-val="return" onclick="setTx(this)">Return</button>
+        </div>
+        {% else %}
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px" id="txTypeGrid">
+          <button type="button" class="tx-btn btn btn-outline active" data-val="investment" onclick="setTx(this)">Investment</button>
+          <button type="button" class="tx-btn btn btn-outline" data-val="dividend" onclick="setTx(this)">Dividend</button>
+        </div>
+        {% endif %}
+        <input type="hidden" name="tx_type" id="txTypeInput" value="{% if supplier.ownership == 'external' %}purchase{% else %}investment{% endif %}">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Amount ({{ store.currency_symbol }}) *</label>
+        <input type="number" name="amount" class="form-input" step="0.01" min="0.01" inputmode="decimal" required style="font-size:20px;font-weight:600;text-align:center">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input type="text" name="description" class="form-input" placeholder="Optional note">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input type="date" name="date" class="form-input" value="{{ today }}">
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button type="button" class="btn btn-outline" style="flex:1" onclick="document.getElementById('txModal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="flex:2">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function setTx(btn) {
+  document.querySelectorAll('.tx-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('txTypeInput').value = btn.dataset.val;
+}
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+const style = document.createElement('style');
+style.textContent = '.tx-btn.active{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}';
+document.head.appendChild(style);
+</script>
+{% endblock %}

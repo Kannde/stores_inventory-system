@@ -36,6 +36,15 @@
         </select>
       </div>
       <div class="form-group">
+        <label class="form-label">Supplier</label>
+        <select name="supplier" class="form-select">
+          <option value="">-- No Supplier --</option>
+          {% for s in suppliers %}
+          <option value="{{ s.id }}" {% if product.supplier_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
         <label class="form-label">Description</label>
         <textarea name="description" class="form-textarea">{{ product.description|default:'' }}</textarea>
       </div>
