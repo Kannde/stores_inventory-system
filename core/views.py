@@ -319,6 +319,7 @@ def store_settings(request, store_slug):
         settings_obj.preorder_expected_days = request.POST.get('preorder_expected_days') or 7
         settings_obj.preorder_welcome_message = request.POST.get('preorder_welcome_message', '')
         settings_obj.preorder_whatsapp_number = request.POST.get('preorder_whatsapp_number', '')
+        settings_obj.preorder_all_products = request.POST.get('preorder_all_products') == 'on'
         settings_obj.save()
         messages.success(request, 'Store settings updated.')
         return redirect('core:store_settings', store_slug=store.slug)

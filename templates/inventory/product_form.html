@@ -30,9 +30,20 @@
         <label class="form-label">Category</label>
         <select name="category" class="form-select">
           <option value="">-- No Category --</option>
-          {% for c in categories %}
-          <option value="{{ c.id }}" {% if product.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
-          {% endfor %}
+          {% if store_categories %}
+          <optgroup label="Your Categories">
+            {% for c in store_categories %}
+            <option value="{{ c.id }}" {% if product.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+          </optgroup>
+          {% endif %}
+          {% if standard_categories %}
+          <optgroup label="Standard Categories (will be created)">
+            {% for c in standard_categories %}
+            <option value="{{ c }}">{{ c }}</option>
+            {% endfor %}
+          </optgroup>
+          {% endif %}
         </select>
       </div>
       <div class="form-group">

@@ -121,8 +121,10 @@
     <div class="form-group" style="margin-top:14px">
       <label class="form-label">Sales Person</label>
       <select id="staffSelect" class="form-select">
-        <option value="">-- Select --</option>
-        {% for s in staff %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+        <option value="">-- None --</option>
+        {% for s in staff %}
+        <option value="{{ s.id }}" {% if current_staff and current_staff.id == s.id %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
       </select>
     </div>
     <div class="form-group">

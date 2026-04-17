@@ -60,6 +60,7 @@ class StoreSettings(models.Model):
     preorder_expected_days = models.PositiveIntegerField(default=7)
     preorder_welcome_message = models.TextField(blank=True)
     preorder_whatsapp_number = models.CharField(max_length=20, blank=True, help_text='WhatsApp number with country code, e.g. 233244000000')
+    preorder_all_products = models.BooleanField(default=True, help_text='Show all active products in preorder catalog')
 
     def __str__(self):
         return f"Settings for {self.store.name}"

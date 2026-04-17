@@ -23,6 +23,13 @@ def new_sale(request, store_slug):
     store = get_store(store_slug, request.user)
     staff = StoreStaff.objects.filter(store=store, is_active=True, role__in=['sales', 'manager'])
 
+    # Auto-detect current user's staff profile
+    current_staff = None
+    try:
+        current_staff = StoreStaff.objects.get(store=store, user=request.user)
+    except StoreStaff.DoesNotExist:
+        pass
+
     products = Product.objects.filter(store=store, is_active=True).prefetch_related('images').order_by('name')
     packages = Package.objects.filter(store=store, is_active=True).prefetch_related('items__product').order_by('name')
 
@@ -47,6 +54,7 @@ def new_sale(request, store_slug):
     return render(request, 'sales/new_sale.html', {
         'store': store,
         'staff': staff,
+        'current_staff': current_staff,
         'products_json': json.dumps(products_data),
         'packages_json': json.dumps(packages_data),
         'allow_partial': store_settings.allow_partial_payment,

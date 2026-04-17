@@ -30,8 +30,13 @@ def product_list(request, store_slug):
 def product_form(request, store_slug, pk=None):
     store = get_store(store_slug, request.user)
     product = get_object_or_404(Product, pk=pk, store=store) if pk else None
-    categories = Category.objects.filter(store=store)
+    store_categories = Category.objects.filter(store=store)
     suppliers = Supplier.objects.filter(store=store, is_active=True)
+
+    # Backfill barcode for existing products that have none
+    if product and not product.barcode:
+        product.barcode = product._generate_barcode()
+        product.save(update_fields=['barcode'])
 
     if request.method == 'POST':
         data = request.POST
@@ -47,8 +52,21 @@ def product_form(request, store_slug, pk=None):
         product.reorder_level = data.get('reorder_level', 5) or 5
         expiry = data.get('expiry_date', '').strip()
         product.expiry_date = expiry if expiry else None
-        cat_id = data.get('category')
-        product.category_id = cat_id if cat_id else None
+
+        # Category: may be existing ID or a new standard category name
+        cat_val = data.get('category', '').strip()
+        if cat_val:
+            try:
+                import uuid as _uuid
+                _uuid.UUID(cat_val)
+                product.category_id = cat_val
+            except ValueError:
+                # It's a name from standard categories — create it
+                cat_obj, _ = Category.objects.get_or_create(store=store, name=cat_val)
+                product.category = cat_obj
+        else:
+            product.category = None
+
         sup_id = data.get('supplier')
         product.supplier_id = sup_id if sup_id else None
         product.save()
@@ -58,8 +76,15 @@ def product_form(request, store_slug, pk=None):
 
         return redirect('inventory:product_list', store_slug=store.slug)
 
+    # Build category options: existing store categories + standard ones not yet created
+    existing_names = set(store_categories.values_list('name', flat=True))
+    standard_not_added = [c for c in STANDARD_RETAIL_CATEGORIES if c not in existing_names]
+
     return render(request, 'inventory/product_form.html', {
-        'store': store, 'product': product, 'categories': categories, 'suppliers': suppliers,
+        'store': store, 'product': product,
+        'store_categories': store_categories,
+        'standard_categories': standard_not_added,
+        'suppliers': suppliers,
     })
 
 
