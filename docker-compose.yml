@@ -25,8 +25,8 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-config.settings}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me}
-      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-127.0.0.1,localhost,0.0.0.0}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-127.0.0.1,localhost}
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-}
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: ${POSTGRES_DB:-stores_inventory_system}
@@ -35,7 +35,10 @@ services:
       DB_HOST: db
       DB_PORT: 5432
     volumes:
-      - .:/app
+      - media_files:/app/media
+      - static_files:/app/staticfiles
 
 volumes:
   postgres_data:
+  media_files:
+  static_files:
