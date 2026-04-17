@@ -24,6 +24,7 @@ def preorder_form(request, store_slug):
             'unit_price': str(p.unit_price), 'stock_qty': p.stock_qty,
             'unit_label': p.unit_label,
             'image_url': first_img.image.url if first_img else None,
+            'lead_days': p.preorder_lead_days,
         })
 
     if request.method == 'POST':

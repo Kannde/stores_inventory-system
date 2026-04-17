@@ -70,6 +70,8 @@ def product_form(request, store_slug, pk=None):
         sup_id = data.get('supplier')
         product.supplier_id = sup_id if sup_id else None
         product.available_for_preorder = data.get('available_for_preorder') == 'on'
+        lead = data.get('preorder_lead_days', '').strip()
+        product.preorder_lead_days = int(lead) if lead and lead.isdigit() else None
         product.save()
 
         for f in request.FILES.getlist('images'):

@@ -119,12 +119,18 @@
 
     <div class="card">
       <label style="display:flex;align-items:center;gap:12px;cursor:pointer">
-        <input type="checkbox" name="available_for_preorder" {% if product.available_for_preorder %}checked{% endif %} style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0">
+        <input type="checkbox" name="available_for_preorder" id="preorderToggle" {% if product.available_for_preorder %}checked{% endif %} style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0" onchange="toggleLeadDays(this)">
         <div>
           <div style="font-weight:600;font-size:14px">Available for Pre-order</div>
           <div style="font-size:12px;color:var(--text-3);margin-top:2px">Show this product in the customer pre-order store</div>
         </div>
       </label>
+      <div id="leadDaysSection" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:{% if product.available_for_preorder %}block{% else %}none{% endif %}">
+        <label class="form-label">Expected Wait Time (days)</label>
+        <input type="number" name="preorder_lead_days" id="preorderLeadDays" class="form-input" min="1" placeholder="e.g. 3"
+          value="{{ product.preorder_lead_days|default:'' }}" style="max-width:140px">
+        <div style="font-size:11px;color:var(--text-3);margin-top:4px">Shown to customers when they select this product. Leave blank to use the store default.</div>
+      </div>
     </div>
 
     <button type="submit" class="btn btn-primary btn-block" style="margin-top:4px">
@@ -134,6 +140,11 @@
 </div>
 {% endblock %}
 {% block scripts %}
+<script>
+function toggleLeadDays(cb) {
+  document.getElementById('leadDaysSection').style.display = cb.checked ? 'block' : 'none';
+}
+</script>
 {% if product and product.barcode %}
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script>

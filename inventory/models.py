@@ -117,6 +117,7 @@ class Product(models.Model):
     expiry_date = models.DateField(null=True, blank=True)
     barcode = models.CharField(max_length=50, blank=True)
     available_for_preorder = models.BooleanField(default=False)
+    preorder_lead_days = models.PositiveIntegerField(null=True, blank=True, help_text='Expected days to fulfil a preorder for this product')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

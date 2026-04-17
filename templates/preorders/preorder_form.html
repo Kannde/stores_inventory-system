@@ -70,6 +70,8 @@
   {% else %}
   <div class="product-grid" id="productGrid"></div>
   <div id="noResults" class="empty" style="display:none;padding:24px 0"><p>No matching products</p></div>
+  <!-- Lead time toast -->
+  <div id="leadToast" style="display:none;position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1b4332;color:#fff;padding:10px 20px;border-radius:24px;font-size:13px;font-weight:600;z-index:200;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.2)"></div>
   {% endif %}
 
   <!-- Cart summary -->
@@ -179,13 +181,27 @@ function renderCatalog(q) {
   }).join('');
 }
 
+let toastTimer = null;
+const DEFAULT_LEAD = {{ store_settings.preorder_expected_days|default:0 }};
+
+function showLeadToast(leadDays) {
+  const days = leadDays || DEFAULT_LEAD;
+  if (!days) return;
+  const toast = document.getElementById('leadToast');
+  toast.textContent = '⏱ Expected wait: ' + days + ' day' + (days > 1 ? 's' : '');
+  toast.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.style.display = 'none'; }, 3000);
+}
+
 function toggleProduct(p) {
   const existing = cart.find(i => i.id === p.id);
   if (existing) {
     existing.quantity++;
   } else {
-    cart.push({ id: p.id, name: p.name, unit_price: parseFloat(p.unit_price), quantity: 1, unit_label: p.unit_label, type: 'product' });
+    cart.push({ id: p.id, name: p.name, unit_price: parseFloat(p.unit_price), quantity: 1, unit_label: p.unit_label, lead_days: p.lead_days, type: 'product' });
   }
+  showLeadToast(p.lead_days);
   renderCatalog(document.getElementById('searchInput').value);
   renderCart();
 }
@@ -214,6 +230,7 @@ function renderCart() {
       <div style="flex:1;min-width:0">
         <div style="font-size:14px;font-weight:500">${escAttr(item.name)}</div>
         <div style="font-size:12px;color:var(--text-3)">${CURRENCY}${item.unit_price.toFixed(2)} / ${escAttr(item.unit_label)}</div>
+        ${(item.lead_days || DEFAULT_LEAD) ? `<div style="font-size:11px;color:var(--accent);margin-top:2px">⏱ ~${item.lead_days || DEFAULT_LEAD} day${(item.lead_days||DEFAULT_LEAD)>1?'s':''} wait</div>` : ''}
       </div>
       <div style="display:flex;align-items:center;gap:6px">
         <button type="button" onclick="updateQty(${i},-1)" style="width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:16px;cursor:pointer">−</button>
