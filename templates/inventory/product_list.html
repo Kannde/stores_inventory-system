@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% block title %}Products - {{ store.name }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'core:store_dashboard' store.slug %}" class="back">←</a>
+  <h1>Products</h1>
+  <a href="{% url 'inventory:package_list' store.slug %}" class="action">Packages</a>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <form method="get" class="search-bar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="search" name="q" placeholder="Search products..." value="{{ q }}">
+  </form>
+
+  {% if categories %}
+  <div class="tabs">
+    <a href="?q={{ q }}" class="tab {% if not cat %}active{% endif %}">All</a>
+    {% for c in categories %}
+    <a href="?q={{ q }}&cat={{ c.id }}" class="tab {% if cat == c.id|slugify %}active{% endif %}">{{ c.name }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% for p in products %}
+  <div class="card" style="padding:12px 16px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="list-icon" style="background:{% if p.is_out_of_stock %}var(--danger-light);color:var(--danger){% elif p.is_low_stock %}var(--warning-light);color:var(--warning){% else %}var(--accent-light);color:var(--accent){% endif %}">
+        {{ p.name|first }}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="list-title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</div>
+        <div class="list-sub">{{ p.unit_label }} {% if p.sku %}· {{ p.sku }}{% endif %}{% if p.category %} · {{ p.category.name }}{% endif %}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:600;font-size:14px">{{ store.currency_symbol }}{{ p.unit_price|floatformat:2 }}</div>
+        <div style="font-size:12px;{% if p.is_out_of_stock %}color:var(--danger){% elif p.is_low_stock %}color:var(--warning){% else %}color:var(--text-3){% endif %}">
+          {{ p.stock_qty }} in stock
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <a href="{% url 'inventory:product_edit' store.slug p.pk %}" class="btn btn-outline btn-sm" style="flex:1">Edit</a>
+      <a href="{% url 'inventory:stock_adjust' store.slug p.pk %}" class="btn btn-outline btn-sm" style="flex:1">Stock</a>
+    </div>
+  </div>
+  {% empty %}
+  <div class="empty">
+    <p>No products found</p>
+    <a href="{% url 'inventory:product_add' store.slug %}" class="btn btn-primary" style="margin-top:12px">Add Product</a>
+  </div>
+  {% endfor %}
+</div>
+<a href="{% url 'inventory:product_add' store.slug %}" class="btn-fab">+</a>
+{% endblock %}
+{% block bottomnav %}{% with nav='products' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

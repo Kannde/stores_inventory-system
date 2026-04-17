@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block title %}Pre-order - {{ store.name }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <h1>{{ store.name }} — Pre-order</h1>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <div style="text-align:center;padding:12px 0 20px">
+    <div style="font-size:15px;color:var(--text-2)">Tell us what you need and we'll prepare it for you</div>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px">Your Details</div>
+      <div class="form-group">
+        <label class="form-label">Full Name *</label>
+        <input type="text" name="customer_name" class="form-input" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone Number *</label>
+        <input type="tel" name="customer_phone" class="form-input" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email (optional)</label>
+        <input type="email" name="customer_email" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">When do you need this?</label>
+        <input type="date" name="desired_date" class="form-input">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">What do you need?</span>
+        <button type="button" class="btn btn-outline btn-sm" onclick="addItem()">+ Add Item</button>
+      </div>
+      <div id="orderItems">
+        <div class="order-row" style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+          <div class="form-group" style="margin-bottom:8px">
+            <input type="text" name="item_description" class="form-input" required placeholder="Describe what you need...">
+          </div>
+          <div style="display:flex;gap:8px">
+            <input type="number" name="item_qty" class="form-input" style="flex:0 0 80px" value="1" min="1" placeholder="Qty">
+            <input type="text" name="item_unit" class="form-input" style="flex:1" value="unit" placeholder="unit, kg, bag...">
+            <button type="button" class="btn btn-outline btn-sm" onclick="removeRow(this)" style="flex:0 0 36px;padding:6px">×</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Special Instructions</label>
+        <textarea name="notes" class="form-textarea" placeholder="Any special requests or notes..."></textarea>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block" style="margin-top:4px;height:48px;font-size:16px">Submit Pre-order</button>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function addItem() {
+  const container = document.getElementById('orderItems');
+  const first = container.querySelector('.order-row');
+  const clone = first.cloneNode(true);
+  clone.querySelector('input[name="item_description"]').value = '';
+  clone.querySelector('input[name="item_qty"]').value = '1';
+  clone.querySelector('input[name="item_unit"]').value = 'unit';
+  container.appendChild(clone);
+}
+function removeRow(btn) {
+  const rows = document.querySelectorAll('.order-row');
+  if (rows.length > 1) btn.closest('.order-row').remove();
+}
+</script>
+{% endblock %}

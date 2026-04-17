@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}Stock - {{ product.name }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'inventory:product_list' store.slug %}" class="back">←</a>
+  <h1>{{ product.name }}</h1>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="stat" style="text-align:center;margin-bottom:16px">
+    <div class="stat-label">Current Stock</div>
+    <div class="stat-value {% if product.is_out_of_stock %}danger{% elif product.is_low_stock %}warning{% else %}accent{% endif %}" style="font-size:36px">
+      {{ product.stock_qty }}
+    </div>
+    <div style="font-size:12px;color:var(--text-3)">{{ product.unit_label }}s · Reorder at {{ product.reorder_level }}</div>
+  </div>
+
+  <form method="post" class="card">
+    {% csrf_token %}
+    <div class="card-title" style="margin-bottom:12px">Adjust Stock</div>
+    <div class="form-group">
+      <label class="form-label">Type</label>
+      <select name="movement_type" class="form-select">
+        <option value="in">Stock In</option>
+        <option value="out">Stock Out</option>
+        <option value="adjust">Adjustment</option>
+        <option value="return">Return</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Quantity</label>
+      <input type="number" name="quantity" class="form-input" required min="1" inputmode="numeric">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Reason</label>
+      <input type="text" name="reason" class="form-input" placeholder="e.g. New delivery, damaged...">
+    </div>
+    <button type="submit" class="btn btn-primary btn-block">Update Stock</button>
+  </form>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:12px">Recent Movements</div>
+    {% for m in movements %}
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <span class="badge {% if m.movement_type == 'in' or m.movement_type == 'return' %}badge-success{% elif m.movement_type == 'sale' or m.movement_type == 'out' %}badge-danger{% else %}badge-info{% endif %}">
+          {{ m.get_movement_type_display }}
+        </span>
+        {% if m.reason %}<span style="font-size:12px;color:var(--text-3);margin-left:6px">{{ m.reason }}</span>{% endif %}
+      </div>
+      <div style="text-align:right">
+        <span style="font-weight:600;{% if m.quantity > 0 %}color:var(--accent){% else %}color:var(--danger){% endif %}">
+          {% if m.quantity > 0 %}+{% endif %}{{ m.quantity }}
+        </span>
+        <div style="font-size:11px;color:var(--text-3)">{{ m.created_at|date:"d M H:i" }}</div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="empty"><p>No movements yet</p></div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+{% block bottomnav %}{% with nav='stock' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

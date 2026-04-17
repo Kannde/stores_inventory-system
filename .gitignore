@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.py[cod]
+db.sqlite3
+.env
+.env.development
+.env.staging
+.env.production
+*.log
+media/
+staticfiles/
+salesapp.tar.gz

@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block title %}{% if package %}Edit{% else %}New{% endif %} Package - {{ store.name }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'inventory:package_list' store.slug %}" class="back">←</a>
+  <h1>{% if package %}Edit Package{% else %}New Package{% endif %}</h1>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <form method="post" id="pkgForm">
+    {% csrf_token %}
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px">Package Info</div>
+      <div class="form-group">
+        <label class="form-label">Package Name *</label>
+        <input type="text" name="name" class="form-input" required value="{{ package.name|default:'' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea name="description" class="form-textarea">{{ package.description|default:'' }}</textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Package Price *</label>
+        <input type="number" name="package_price" class="form-input" step="0.01" required value="{{ package.package_price|default:'' }}">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Products in Package</span>
+        <button type="button" class="btn btn-outline btn-sm" onclick="addRow()">+ Add</button>
+      </div>
+      <div id="items">
+        {% if package %}
+          {% for item in package.items.all %}
+          <div class="pkg-row" style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+            <select name="item_product" class="form-select" style="flex:2">
+              <option value="">Select product</option>
+              {% for p in products %}
+              <option value="{{ p.id }}" {% if p.id == item.product_id %}selected{% endif %}>{{ p.name }} ({{ store.currency_symbol }}{{ p.unit_price }})</option>
+              {% endfor %}
+            </select>
+            <input type="number" name="item_qty" class="form-input" style="flex:0 0 70px" min="1" value="{{ item.quantity }}" placeholder="Qty">
+            <button type="button" class="btn btn-outline btn-sm" onclick="this.parentElement.remove()" style="flex:0 0 36px;padding:6px">×</button>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="pkg-row" style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+            <select name="item_product" class="form-select" style="flex:2">
+              <option value="">Select product</option>
+              {% for p in products %}
+              <option value="{{ p.id }}">{{ p.name }} ({{ store.currency_symbol }}{{ p.unit_price }})</option>
+              {% endfor %}
+            </select>
+            <input type="number" name="item_qty" class="form-input" style="flex:0 0 70px" min="1" value="1" placeholder="Qty">
+            <button type="button" class="btn btn-outline btn-sm" onclick="this.parentElement.remove()" style="flex:0 0 36px;padding:6px">×</button>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block">{% if package %}Save Changes{% else %}Create Package{% endif %}</button>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function addRow() {
+  const container = document.getElementById('items');
+  const first = container.querySelector('.pkg-row');
+  if (!first) return;
+  const clone = first.cloneNode(true);
+  clone.querySelector('select').value = '';
+  clone.querySelector('input').value = '1';
+  container.appendChild(clone);
+}
+</script>
+{% endblock %}

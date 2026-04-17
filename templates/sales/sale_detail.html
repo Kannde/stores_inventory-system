@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block title %}Sale {{ sale.receipt_number }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'sales:sale_list' store.slug %}" class="back">←</a>
+  <h1>{{ sale.receipt_number }}</h1>
+  <a href="{% url 'sales:sale_receipt' store.slug sale.pk %}" class="action">Receipt</a>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="card" style="text-align:center">
+    <div style="font-size:28px;font-weight:700;color:var(--accent)">{{ store.currency_symbol }}{{ sale.total_amount|floatformat:2 }}</div>
+    <div style="font-size:13px;color:var(--text-3);margin-top:4px">{{ sale.created_at|date:"d M Y, H:i" }}</div>
+    <div style="margin-top:8px">
+      <span class="badge {% if sale.status == 'completed' %}badge-success{% else %}badge-warning{% endif %}">{{ sale.get_status_display }}</span>
+      <span class="badge badge-info">{{ sale.get_payment_method_display }}</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:10px">Items</div>
+    {% for item in sale.items.all %}
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:14px">{{ item.item_name }}</div>
+        <div style="font-size:12px;color:var(--text-3)">{{ item.quantity }} × {{ store.currency_symbol }}{{ item.unit_price|floatformat:2 }}</div>
+      </div>
+      <div style="font-weight:600">{{ store.currency_symbol }}{{ item.line_total|floatformat:2 }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;padding:4px 0">
+      <span style="color:var(--text-2)">Amount Paid</span>
+      <span style="font-weight:600">{{ store.currency_symbol }}{{ sale.amount_paid|floatformat:2 }}</span>
+    </div>
+    {% if sale.change_given > 0 %}
+    <div style="display:flex;justify-content:space-between;padding:4px 0">
+      <span style="color:var(--text-2)">Change</span>
+      <span style="font-weight:600;color:var(--accent)">{{ store.currency_symbol }}{{ sale.change_given|floatformat:2 }}</span>
+    </div>
+    {% endif %}
+    {% if sale.staff %}
+    <div style="display:flex;justify-content:space-between;padding:4px 0">
+      <span style="color:var(--text-2)">Sold by</span>
+      <span>{{ sale.staff.name }}</span>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block bottomnav %}{% with nav='pos' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

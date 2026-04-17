@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Staff - {{ store.name }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'core:store_dashboard' store.slug %}" class="back">←</a>
+  <h1>Staff</h1>
+  <a href="{% url 'core:staff_add' store.slug %}" class="action">+ Add</a>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+  {% for m in staff %}
+  <div class="card" style="display:flex;align-items:center;gap:12px">
+    <div class="list-icon" style="background:{% if m.is_active %}var(--accent-light);color:var(--accent){% else %}var(--surface-2);color:var(--text-3){% endif %}">
+      {{ m.name|first }}
+    </div>
+    <div style="flex:1">
+      <div class="list-title">{{ m.name }}</div>
+      <div class="list-sub">{{ m.get_role_display }}{% if m.phone %} · {{ m.phone }}{% endif %}</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span class="badge {% if m.is_active %}badge-success{% else %}badge-danger{% endif %}">
+        {{ m.is_active|yesno:"Active,Inactive" }}
+      </span>
+      <a href="{% url 'core:staff_edit' store.slug m.pk %}" class="btn btn-outline btn-sm">Edit</a>
+    </div>
+  </div>
+  {% empty %}
+  <div class="empty"><p>No staff members yet</p></div>
+  {% endfor %}
+</div>
+{% endblock %}
+{% block bottomnav %}{% with nav='dashboard' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

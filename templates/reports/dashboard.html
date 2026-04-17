@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% block title %}Reports - {{ store.name }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'core:store_dashboard' store.slug %}" class="back">←</a>
+  <h1>Reports</h1>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="tabs">
+    <a href="?period=7" class="tab {% if period == '7' %}active{% endif %}">7 Days</a>
+    <a href="?period=14" class="tab {% if period == '14' %}active{% endif %}">14 Days</a>
+    <a href="?period=30" class="tab {% if period == '30' %}active{% endif %}">30 Days</a>
+    <a href="?period=90" class="tab {% if period == '90' %}active{% endif %}">90 Days</a>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">Revenue</div>
+      <div class="stat-value accent">{{ store.currency_symbol }}{{ total_revenue|floatformat:0 }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Sales</div>
+      <div class="stat-value">{{ total_sales }}</div>
+    </div>
+    <div class="stat" style="grid-column:span 2">
+      <div class="stat-label">Avg Sale</div>
+      <div class="stat-value">{{ store.currency_symbol }}{{ avg_sale|floatformat:2 }}</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:12px">Revenue Trend</div>
+    <canvas id="revenueChart" height="200"></canvas>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:12px">Top Products</div>
+    <div id="topProducts">
+      <div class="empty"><p>Loading...</p></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block bottomnav %}{% with nav='reports' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const STORE_SLUG = '{{ store.slug }}';
+const CURRENCY = '{{ store.currency_symbol }}';
+const DAYS = {{ period }};
+
+async function loadChart() {
+  const res = await fetch(`/s/${STORE_SLUG}/reports/api/sales-chart/?days=${DAYS}`);
+  const data = await res.json();
+  const ctx = document.getElementById('revenueChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: data.map(d => d.date),
+      datasets: [{
+        label: 'Revenue',
+        data: data.map(d => d.revenue),
+        backgroundColor: '#2d6a4f22',
+        borderColor: '#2d6a4f',
+        borderWidth: 1.5,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: v => CURRENCY + v } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+async function loadTopProducts() {
+  const res = await fetch(`/s/${STORE_SLUG}/reports/api/top-products/?days=${DAYS}`);
+  const data = await res.json();
+  const el = document.getElementById('topProducts');
+  if (!data.length) { el.innerHTML = '<div class="empty"><p>No product sales data</p></div>'; return; }
+
+  const maxRev = Math.max(...data.map(d => d.total_rev));
+  el.innerHTML = data.map((d, i) => `
+    <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:13px;font-weight:500">${i+1}. ${d.product__name}</span>
+        <span style="font-size:13px;font-weight:600;color:var(--accent)">${CURRENCY}${d.total_rev.toFixed(2)}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="flex:1;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden">
+          <div style="width:${(d.total_rev/maxRev*100).toFixed(0)}%;height:100%;background:var(--accent);border-radius:3px"></div>
+        </div>
+        <span style="font-size:11px;color:var(--text-3)">${d.total_qty} sold</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+loadChart();
+loadTopProducts();
+</script>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Categories - {{ store.name }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'inventory:product_list' store.slug %}" class="back">←</a>
+  <h1>Categories</h1>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <form method="post" class="card" style="display:flex;gap:8px;align-items:flex-end">
+    {% csrf_token %}
+    <div class="form-group" style="flex:1;margin-bottom:0">
+      <label class="form-label">New Category</label>
+      <input type="text" name="name" class="form-input" required placeholder="Category name">
+    </div>
+    <button type="submit" class="btn btn-primary">Add</button>
+  </form>
+
+  <div class="card">
+    {% for c in categories %}
+    <div class="list-item" style="margin:0 -16px;padding:10px 16px">
+      <div class="list-content">
+        <div class="list-title">{{ c.name }}</div>
+        <div class="list-sub">{{ c.products.count }} products</div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="empty"><p>No categories yet</p></div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

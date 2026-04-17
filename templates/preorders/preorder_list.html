@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}Pre-orders - {{ store.name }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'core:store_dashboard' store.slug %}" class="back">←</a>
+  <h1>Pre-orders</h1>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="tabs">
+    <a href="?status=pending" class="tab {% if current_status == 'pending' %}active{% endif %}">Pending</a>
+    <a href="?status=confirmed" class="tab {% if current_status == 'confirmed' %}active{% endif %}">Confirmed</a>
+    <a href="?status=ready" class="tab {% if current_status == 'ready' %}active{% endif %}">Ready</a>
+    <a href="?status=fulfilled" class="tab {% if current_status == 'fulfilled' %}active{% endif %}">Fulfilled</a>
+    <a href="?status=all" class="tab {% if current_status == 'all' %}active{% endif %}">All</a>
+  </div>
+
+  {% for po in preorders %}
+  <a href="{% url 'preorders:preorder_detail' store.slug po.pk %}" class="card" style="display:block;text-decoration:none;color:inherit">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div>
+        <div style="font-weight:600;font-size:15px">{{ po.customer_name }}</div>
+        <div style="font-size:12px;color:var(--text-3)">{{ po.customer_phone }} · {{ po.created_at|date:"d M, H:i" }}</div>
+        <div style="font-size:13px;color:var(--text-2);margin-top:4px">
+          {{ po.items.count }} item{{ po.items.count|pluralize }}
+          {% if po.desired_date %} · Need by {{ po.desired_date|date:"d M" }}{% endif %}
+        </div>
+      </div>
+      <span class="badge {% if po.status == 'pending' %}badge-warning{% elif po.status == 'confirmed' %}badge-info{% elif po.status == 'ready' %}badge-success{% elif po.status == 'fulfilled' %}badge-success{% else %}badge-danger{% endif %}">
+        {{ po.get_status_display }}
+      </span>
+    </div>
+  </a>
+  {% empty %}
+  <div class="empty"><p>No pre-orders found</p></div>
+  {% endfor %}
+</div>
+{% endblock %}
+{% block bottomnav %}{% with nav='dashboard' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Receipt - {{ sale.receipt_number }}</title>
+<style>
+body { font-family: 'Courier New', monospace; max-width: 300px; margin: 20px auto; font-size: 13px; color: #000; }
+.center { text-align: center; }
+.line { border-top: 1px dashed #000; margin: 8px 0; }
+.row { display: flex; justify-content: space-between; padding: 2px 0; }
+.bold { font-weight: bold; }
+.big { font-size: 18px; }
+@media print { .no-print { display: none; } }
+</style>
+</head>
+<body>
+<div class="center">
+  <div class="bold big">{{ store.name }}</div>
+  {% if store.location %}<div>{{ store.location }}</div>{% endif %}
+  {% if store.phone %}<div>Tel: {{ store.phone }}</div>{% endif %}
+</div>
+<div class="line"></div>
+<div class="row"><span>Receipt:</span><span>{{ sale.receipt_number }}</span></div>
+<div class="row"><span>Date:</span><span>{{ sale.created_at|date:"d/m/Y H:i" }}</span></div>
+{% if sale.staff %}<div class="row"><span>Cashier:</span><span>{{ sale.staff.name }}</span></div>{% endif %}
+<div class="line"></div>
+{% for item in sale.items.all %}
+<div>{{ item.item_name }}</div>
+<div class="row"><span>{{ item.quantity }} x {{ store.currency_symbol }}{{ item.unit_price|floatformat:2 }}</span><span>{{ store.currency_symbol }}{{ item.line_total|floatformat:2 }}</span></div>
+{% endfor %}
+<div class="line"></div>
+<div class="row bold"><span>TOTAL</span><span class="big">{{ store.currency_symbol }}{{ sale.total_amount|floatformat:2 }}</span></div>
+<div class="row"><span>Paid ({{ sale.get_payment_method_display }})</span><span>{{ store.currency_symbol }}{{ sale.amount_paid|floatformat:2 }}</span></div>
+{% if sale.change_given > 0 %}
+<div class="row"><span>Change</span><span>{{ store.currency_symbol }}{{ sale.change_given|floatformat:2 }}</span></div>
+{% endif %}
+<div class="line"></div>
+<div class="center" style="font-size:11px">Thank you for your purchase!</div>
+<div class="center no-print" style="margin-top:20px">
+  <button onclick="window.print()" style="padding:10px 30px;font-size:14px;cursor:pointer;border-radius:8px;border:1px solid #ccc">Print Receipt</button>
+</div>
+</body>
+</html>

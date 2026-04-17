@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}Stock Overview - {{ store.name }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'core:store_dashboard' store.slug %}" class="back">←</a>
+  <h1>Stock Overview</h1>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+  {% if out_of_stock %}
+  <div class="card" style="border-left:3px solid var(--danger)">
+    <div class="card-title" style="color:var(--danger);margin-bottom:8px">Out of Stock ({{ out_of_stock.count }})</div>
+    {% for p in out_of_stock %}
+    <a href="{% url 'inventory:stock_adjust' store.slug p.pk %}" class="list-item" style="text-decoration:none;color:inherit;margin:0 -16px;padding:8px 16px">
+      <div class="list-content">
+        <div class="list-title">{{ p.name }}</div>
+      </div>
+      <div class="badge badge-danger">{{ p.stock_qty }}</div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if low_stock %}
+  <div class="card" style="border-left:3px solid var(--warning)">
+    <div class="card-title" style="color:var(--warning);margin-bottom:8px">Low Stock ({{ low_stock.count }})</div>
+    {% for p in low_stock %}
+    <a href="{% url 'inventory:stock_adjust' store.slug p.pk %}" class="list-item" style="text-decoration:none;color:inherit;margin:0 -16px;padding:8px 16px">
+      <div class="list-content">
+        <div class="list-title">{{ p.name }}</div>
+        <div class="list-sub">Reorder at {{ p.reorder_level }}</div>
+      </div>
+      <div class="badge badge-warning">{{ p.stock_qty }}</div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:8px">All Products</div>
+    {% for p in products %}
+    <a href="{% url 'inventory:stock_adjust' store.slug p.pk %}" class="list-item" style="text-decoration:none;color:inherit;margin:0 -16px;padding:8px 16px">
+      <div class="list-content">
+        <div class="list-title">{{ p.name }}</div>
+        <div class="list-sub">{{ p.unit_label }}</div>
+      </div>
+      <div style="font-weight:600;font-size:14px;{% if p.is_out_of_stock %}color:var(--danger){% elif p.is_low_stock %}color:var(--warning){% else %}color:var(--accent){% endif %}">
+        {{ p.stock_qty }}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+{% block bottomnav %}{% with nav='stock' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

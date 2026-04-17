@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block title %}{% if staff_member %}Edit{% else %}Add{% endif %} Staff - {{ store.name }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'core:staff_list' store.slug %}" class="back">←</a>
+  <h1>{% if staff_member %}Edit Staff{% else %}Add Staff{% endif %}</h1>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <form method="post" class="card">
+    {% csrf_token %}
+    <div class="form-group">
+      <label class="form-label">Full Name *</label>
+      <input type="text" name="name" class="form-input" required value="{{ staff_member.name|default:'' }}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Phone</label>
+      <input type="tel" name="phone" class="form-input" value="{{ staff_member.phone|default:'' }}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Role</label>
+      <select name="role" class="form-select">
+        <option value="sales" {% if staff_member.role == 'sales' %}selected{% endif %}>Sales Person</option>
+        <option value="manager" {% if staff_member.role == 'manager' %}selected{% endif %}>Manager</option>
+        <option value="stock" {% if staff_member.role == 'stock' %}selected{% endif %}>Stock Keeper</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">PIN (for quick login)</label>
+      <input type="text" name="pin" class="form-input" maxlength="6" inputmode="numeric" value="{{ staff_member.pin|default:'' }}">
+    </div>
+    <button type="submit" class="btn btn-primary btn-block">{% if staff_member %}Save Changes{% else %}Add Staff{% endif %}</button>
+  </form>
+</div>
+{% endblock %}

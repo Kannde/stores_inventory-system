@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block title %}Pre-order Submitted{% endblock %}
+{% block content %}
+<div class="container" style="text-align:center;padding-top:60px">
+  <div style="font-size:56px;margin-bottom:12px">✓</div>
+  <h2 style="font-size:22px;font-weight:600;color:var(--accent)">Pre-order Submitted</h2>
+  <p style="color:var(--text-2);margin-top:8px;font-size:15px">
+    {{ store.name }} will review your order and contact you soon.
+  </p>
+  <a href="{% url 'preorders:preorder_form' store.slug %}" class="btn btn-outline" style="margin-top:24px">Submit Another</a>
+</div>
+{% endblock %}

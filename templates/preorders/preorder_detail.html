@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block title %}Pre-order - {{ preorder.customer_name }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'preorders:preorder_list' store.slug %}" class="back">←</a>
+  <h1>Pre-order Details</h1>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="card" style="text-align:center">
+    <span class="badge {% if preorder.status == 'pending' %}badge-warning{% elif preorder.status == 'confirmed' %}badge-info{% elif preorder.status == 'ready' %}badge-success{% elif preorder.status == 'fulfilled' %}badge-success{% else %}badge-danger{% endif %}" style="font-size:13px;padding:5px 14px">
+      {{ preorder.get_status_display }}
+    </span>
+    <div style="font-size:18px;font-weight:600;margin-top:10px">{{ preorder.customer_name }}</div>
+    <div style="font-size:14px;color:var(--text-2)">
+      <a href="tel:{{ preorder.customer_phone }}">{{ preorder.customer_phone }}</a>
+      {% if preorder.customer_email %} · {{ preorder.customer_email }}{% endif %}
+    </div>
+    <div style="font-size:12px;color:var(--text-3);margin-top:4px">
+      Submitted {{ preorder.created_at|date:"d M Y, H:i" }}
+      {% if preorder.desired_date %} · Need by {{ preorder.desired_date|date:"d M Y" }}{% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:10px">Items Requested</div>
+    {% for item in preorder.items.all %}
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span>{{ item.item_description }}</span>
+      <span style="color:var(--text-3);font-weight:500">{{ item.quantity }} {{ item.unit_label }}</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if preorder.notes %}
+  <div class="card">
+    <div class="card-title" style="margin-bottom:6px">Customer Notes</div>
+    <div style="font-size:14px;color:var(--text-2)">{{ preorder.notes }}</div>
+  </div>
+  {% endif %}
+
+  {% if preorder.status != 'fulfilled' and preorder.status != 'cancelled' %}
+  <div class="card">
+    <div class="card-title" style="margin-bottom:12px">Update Status</div>
+    <form method="post" action="{% url 'preorders:preorder_status' store.slug preorder.pk %}">
+      {% csrf_token %}
+      <div class="form-group">
+        <select name="status" class="form-select">
+          <option value="pending" {% if preorder.status == 'pending' %}selected{% endif %}>Pending</option>
+          <option value="confirmed" {% if preorder.status == 'confirmed' %}selected{% endif %}>Confirmed</option>
+          <option value="ready" {% if preorder.status == 'ready' %}selected{% endif %}>Ready for Pickup</option>
+          <option value="fulfilled" {% if preorder.status == 'fulfilled' %}selected{% endif %}>Fulfilled</option>
+          <option value="cancelled" {% if preorder.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Staff Notes</label>
+        <textarea name="staff_notes" class="form-textarea">{{ preorder.staff_notes }}</textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Update</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block bottomnav %}{% with nav='dashboard' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

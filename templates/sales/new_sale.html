@@ -1,0 +1,330 @@
+{% extends 'base.html' %}
+{% block title %}New Sale - {{ store.name }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'core:store_dashboard' store.slug %}" class="back">←</a>
+  <h1>New Sale</h1>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container" style="padding-bottom:200px">
+  <!-- Search -->
+  <div class="search-bar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="search" id="searchInput" placeholder="Search products or packages..." autocomplete="off">
+  </div>
+  <div id="searchResults" style="display:none" class="card"></div>
+
+  <!-- Cart -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Cart</span>
+      <span id="cartCount" style="font-size:13px;color:var(--text-3)">0 items</span>
+    </div>
+    <div id="cartItems">
+      <div class="empty" id="emptyCart"><p>Add products to begin</p></div>
+    </div>
+  </div>
+
+  <!-- Totals & Checkout (sticky bottom) -->
+  <div id="checkoutBar" style="display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:12px 16px calc(12px + env(safe-area-inset-bottom,0));z-index:95;box-shadow:0 -2px 10px rgba(0,0,0,.08)">
+    <div style="max-width:600px;margin:0 auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:14px;color:var(--text-2)">Total</span>
+        <span id="totalAmount" style="font-size:22px;font-weight:700;color:var(--accent)">{{ store.currency_symbol }}0.00</span>
+      </div>
+      <button type="button" class="btn btn-primary btn-block" onclick="openCheckout()" style="height:48px;font-size:16px">
+        Checkout
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Checkout Modal -->
+<div class="modal-overlay" id="checkoutModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <h2 style="font-size:18px;font-weight:600;margin-bottom:16px">Checkout</h2>
+
+    <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:16px">Total</span>
+      <span id="modalTotal" style="font-size:20px;font-weight:700;color:var(--accent)"></span>
+    </div>
+
+    <div class="form-group" style="margin-top:14px">
+      <label class="form-label">Sales Person</label>
+      <select id="staffSelect" class="form-select">
+        <option value="">-- Select --</option>
+        {% for s in staff %}
+        <option value="{{ s.id }}">{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Payment Method</label>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+        <button type="button" class="pay-method btn btn-outline active" data-method="cash" onclick="selectPay(this)">Cash</button>
+        <button type="button" class="pay-method btn btn-outline" data-method="momo" onclick="selectPay(this)">Mobile Money</button>
+        <button type="button" class="pay-method btn btn-outline" data-method="card" onclick="selectPay(this)">Card</button>
+        <button type="button" class="pay-method btn btn-outline" data-method="credit" onclick="selectPay(this)">Credit</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Amount Received</label>
+      <input type="number" id="amountPaid" class="form-input" step="0.01" inputmode="decimal" style="font-size:20px;font-weight:600;text-align:center">
+    </div>
+
+    <div id="changeDisplay" style="display:none;text-align:center;padding:10px;background:var(--accent-light);border-radius:var(--radius-sm);margin-bottom:12px">
+      <div style="font-size:12px;color:var(--accent-dark)">Change</div>
+      <div id="changeAmount" style="font-size:22px;font-weight:700;color:var(--accent-dark)"></div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Notes</label>
+      <input type="text" id="saleNotes" class="form-input" placeholder="Optional">
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button type="button" class="btn btn-outline" style="flex:1" onclick="closeCheckout()">Cancel</button>
+      <button type="button" class="btn btn-primary" style="flex:2" id="confirmBtn" onclick="completeSale()">Complete Sale</button>
+    </div>
+  </div>
+</div>
+
+<!-- Receipt Modal -->
+<div class="modal-overlay" id="receiptModal">
+  <div class="modal-sheet" style="text-align:center">
+    <div class="modal-handle"></div>
+    <div style="font-size:48px;margin-bottom:8px">✓</div>
+    <h2 style="font-size:20px;font-weight:600;color:var(--accent)">Sale Complete</h2>
+    <div id="receiptNumber" style="font-size:14px;color:var(--text-3);margin-top:4px"></div>
+    <div id="receiptTotal" style="font-size:28px;font-weight:700;margin:16px 0"></div>
+    <div id="receiptChange" style="display:none;font-size:14px;color:var(--accent);margin-bottom:16px"></div>
+    <div style="display:flex;gap:8px">
+      <a id="receiptLink" href="#" class="btn btn-outline" style="flex:1">View Receipt</a>
+      <button type="button" class="btn btn-primary" style="flex:1" onclick="newSale()">New Sale</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const STORE_SLUG = '{{ store.slug }}';
+const CURRENCY = '{{ store.currency_symbol }}';
+let cart = [];
+let payMethod = 'cash';
+let searchTimeout;
+
+// Search
+const searchInput = document.getElementById('searchInput');
+const searchResults = document.getElementById('searchResults');
+
+searchInput.addEventListener('input', function() {
+  clearTimeout(searchTimeout);
+  const q = this.value.trim();
+  if (q.length < 1) { searchResults.style.display = 'none'; return; }
+  searchTimeout = setTimeout(() => doSearch(q), 250);
+});
+
+async function doSearch(q) {
+  const [prodRes, pkgRes] = await Promise.all([
+    fetch(`/s/${STORE_SLUG}/api/products/?q=${encodeURIComponent(q)}`),
+    fetch(`/s/${STORE_SLUG}/api/packages/`)
+  ]);
+  const products = await prodRes.json();
+  const packages = (await pkgRes.json()).filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
+
+  let html = '';
+  products.forEach(p => {
+    html += `<div class="list-item" style="cursor:pointer" onclick="addProduct(${JSON.stringify(p).replace(/"/g,'&quot;')})">
+      <div class="list-content">
+        <div class="list-title">${p.name}</div>
+        <div class="list-sub">${p.stock_qty} in stock · ${p.unit_label}</div>
+      </div>
+      <div style="font-weight:600;color:var(--accent)">${CURRENCY}${parseFloat(p.unit_price).toFixed(2)}</div>
+    </div>`;
+  });
+  packages.forEach(p => {
+    const items = p.items.map(i => `${i.qty}× ${i.product}`).join(', ');
+    html += `<div class="list-item" style="cursor:pointer" onclick="addPackage(${JSON.stringify(p).replace(/"/g,'&quot;')})">
+      <div class="list-content">
+        <div class="list-title"><span class="badge badge-info" style="margin-right:4px">PKG</span>${p.name}</div>
+        <div class="list-sub">${items}</div>
+      </div>
+      <div style="font-weight:600;color:var(--accent)">${CURRENCY}${parseFloat(p.package_price).toFixed(2)}</div>
+    </div>`;
+  });
+  if (!html) html = '<div class="empty" style="padding:16px"><p>No results</p></div>';
+  searchResults.innerHTML = html;
+  searchResults.style.display = 'block';
+}
+
+function addProduct(p) {
+  const existing = cart.find(i => i.id === p.id && i.type === 'product');
+  if (existing) { existing.quantity++; }
+  else { cart.push({ id: p.id, name: p.name, unit_price: parseFloat(p.unit_price), quantity: 1, type: 'product' }); }
+  renderCart();
+  searchInput.value = '';
+  searchResults.style.display = 'none';
+}
+
+function addPackage(p) {
+  const existing = cart.find(i => i.id === p.id && i.type === 'package');
+  if (existing) { existing.quantity++; }
+  else { cart.push({ id: p.id, name: p.name, unit_price: parseFloat(p.package_price), quantity: 1, type: 'package' }); }
+  renderCart();
+  searchInput.value = '';
+  searchResults.style.display = 'none';
+}
+
+function updateQty(idx, delta) {
+  cart[idx].quantity += delta;
+  if (cart[idx].quantity <= 0) cart.splice(idx, 1);
+  renderCart();
+}
+
+function removeItem(idx) {
+  cart.splice(idx, 1);
+  renderCart();
+}
+
+function getTotal() {
+  return cart.reduce((s, i) => s + i.unit_price * i.quantity, 0);
+}
+
+function renderCart() {
+  const container = document.getElementById('cartItems');
+  const bar = document.getElementById('checkoutBar');
+  const empty = document.getElementById('emptyCart');
+
+  if (cart.length === 0) {
+    container.innerHTML = '<div class="empty"><p>Add products to begin</p></div>';
+    bar.style.display = 'none';
+    document.getElementById('cartCount').textContent = '0 items';
+    return;
+  }
+
+  let html = '';
+  cart.forEach((item, i) => {
+    const line = (item.unit_price * item.quantity).toFixed(2);
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          ${item.type === 'package' ? '<span class="badge badge-info" style="margin-right:4px;font-size:9px">PKG</span>' : ''}${item.name}
+        </div>
+        <div style="font-size:12px;color:var(--text-3)">${CURRENCY}${item.unit_price.toFixed(2)} each</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button type="button" onclick="updateQty(${i},-1)" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:16px;cursor:pointer">−</button>
+        <span style="min-width:24px;text-align:center;font-weight:600">${item.quantity}</span>
+        <button type="button" onclick="updateQty(${i},1)" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:16px;cursor:pointer">+</button>
+      </div>
+      <div style="min-width:70px;text-align:right;font-weight:600">${CURRENCY}${line}</div>
+      <button type="button" onclick="removeItem(${i})" style="color:var(--danger);background:none;border:none;font-size:18px;cursor:pointer;padding:4px">×</button>
+    </div>`;
+  });
+  container.innerHTML = html;
+
+  const total = getTotal();
+  document.getElementById('totalAmount').textContent = CURRENCY + total.toFixed(2);
+  document.getElementById('cartCount').textContent = cart.length + ' item' + (cart.length > 1 ? 's' : '');
+  bar.style.display = 'block';
+}
+
+// Checkout
+function selectPay(el) {
+  document.querySelectorAll('.pay-method').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  payMethod = el.dataset.method;
+}
+
+function openCheckout() {
+  const total = getTotal();
+  document.getElementById('modalTotal').textContent = CURRENCY + total.toFixed(2);
+  document.getElementById('amountPaid').value = total.toFixed(2);
+  document.getElementById('checkoutModal').classList.add('open');
+  updateChange();
+}
+
+function closeCheckout() {
+  document.getElementById('checkoutModal').classList.remove('open');
+}
+
+document.getElementById('amountPaid').addEventListener('input', updateChange);
+
+function updateChange() {
+  const paid = parseFloat(document.getElementById('amountPaid').value) || 0;
+  const total = getTotal();
+  const change = paid - total;
+  const el = document.getElementById('changeDisplay');
+  if (change > 0) {
+    el.style.display = 'block';
+    document.getElementById('changeAmount').textContent = CURRENCY + change.toFixed(2);
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+async function completeSale() {
+  const btn = document.getElementById('confirmBtn');
+  btn.disabled = true;
+  btn.textContent = 'Processing...';
+
+  const body = {
+    items: cart,
+    staff_id: document.getElementById('staffSelect').value || null,
+    payment_method: payMethod,
+    amount_paid: parseFloat(document.getElementById('amountPaid').value) || 0,
+    notes: document.getElementById('saleNotes').value,
+  };
+
+  try {
+    const res = await fetch(`/s/${STORE_SLUG}/sales/api/checkout/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (data.success) {
+      closeCheckout();
+      document.getElementById('receiptNumber').textContent = data.receipt_number;
+      document.getElementById('receiptTotal').textContent = CURRENCY + parseFloat(data.total).toFixed(2);
+      if (parseFloat(data.change) > 0) {
+        document.getElementById('receiptChange').style.display = 'block';
+        document.getElementById('receiptChange').textContent = 'Change: ' + CURRENCY + parseFloat(data.change).toFixed(2);
+      }
+      document.getElementById('receiptLink').href = `/s/${STORE_SLUG}/sales/${data.sale_id}/receipt/`;
+      document.getElementById('receiptModal').classList.add('open');
+    } else {
+      alert(data.error || 'Error processing sale');
+    }
+  } catch (e) {
+    alert('Network error');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Complete Sale';
+}
+
+function newSale() {
+  cart = [];
+  renderCart();
+  document.getElementById('receiptModal').classList.remove('open');
+  document.getElementById('receiptChange').style.display = 'none';
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('open');
+  });
+});
+
+// Style for active payment button
+const style = document.createElement('style');
+style.textContent = '.pay-method.active{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}';
+document.head.appendChild(style);
+</script>
+{% endblock %}

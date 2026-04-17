@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block title %}{% if product %}Edit{% else %}Add{% endif %} Product - {{ store.name }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'inventory:product_list' store.slug %}" class="back">←</a>
+  <h1>{% if product %}Edit Product{% else %}New Product{% endif %}</h1>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px">Product Details</div>
+      <div class="form-group">
+        <label class="form-label">Product Name *</label>
+        <input type="text" name="name" class="form-input" required value="{{ product.name|default:'' }}">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label class="form-label">SKU</label>
+          <input type="text" name="sku" class="form-input" value="{{ product.sku|default:'' }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Unit Label</label>
+          <input type="text" name="unit_label" class="form-input" value="{{ product.unit_label|default:'unit' }}" placeholder="piece, kg, bag...">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <select name="category" class="form-select">
+          <option value="">-- No Category --</option>
+          {% for c in categories %}
+          <option value="{{ c.id }}" {% if product.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea name="description" class="form-textarea">{{ product.description|default:'' }}</textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px">Pricing</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label class="form-label">Selling Price *</label>
+          <input type="number" name="unit_price" class="form-input" step="0.01" required value="{{ product.unit_price|default:'' }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cost Price</label>
+          <input type="number" name="cost_price" class="form-input" step="0.01" value="{{ product.cost_price|default:'0' }}">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px">Stock</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label class="form-label">Current Stock</label>
+          <input type="number" name="stock_qty" class="form-input" value="{{ product.stock_qty|default:'0' }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Reorder Level</label>
+          <input type="number" name="reorder_level" class="form-input" value="{{ product.reorder_level|default:'5' }}">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px">Images</div>
+      {% if product %}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        {% for img in product.images.all %}
+        <img src="{{ img.image.url }}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
+        {% endfor %}
+      </div>
+      {% endif %}
+      <input type="file" name="images" class="form-input" accept="image/*" multiple>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block" style="margin-top:4px">
+      {% if product %}Save Changes{% else %}Add Product{% endif %}
+    </button>
+  </form>
+</div>
+{% endblock %}
