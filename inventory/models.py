@@ -116,6 +116,7 @@ class Product(models.Model):
     reorder_level = models.IntegerField(default=5)
     expiry_date = models.DateField(null=True, blank=True)
     barcode = models.CharField(max_length=50, blank=True)
+    available_for_preorder = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

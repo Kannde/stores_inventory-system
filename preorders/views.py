@@ -15,7 +15,7 @@ def preorder_form(request, store_slug):
     if not store_settings.preorder_enabled:
         return render(request, 'preorders/preorder_disabled.html', {'store': store})
 
-    products = Product.objects.filter(store=store, is_active=True).prefetch_related('images').order_by('name')
+    products = Product.objects.filter(store=store, is_active=True, available_for_preorder=True).prefetch_related('images').order_by('name')
     products_data = []
     for p in products:
         first_img = p.images.first()

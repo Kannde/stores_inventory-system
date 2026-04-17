@@ -62,8 +62,15 @@
     <input type="search" id="searchInput" placeholder="Search products..." autocomplete="off" style="padding-left:40px">
   </div>
 
+  {% if not products_json or products_json == '[]' %}
+  <div class="empty" style="padding:40px 0">
+    <p style="font-size:15px;font-weight:600">No products available yet</p>
+    <p style="font-size:13px;color:var(--text-3)">The store has not listed any products for pre-order yet.</p>
+  </div>
+  {% else %}
   <div class="product-grid" id="productGrid"></div>
   <div id="noResults" class="empty" style="display:none;padding:24px 0"><p>No matching products</p></div>
+  {% endif %}
 
   <!-- Cart summary -->
   <div id="cartSection" style="display:none">

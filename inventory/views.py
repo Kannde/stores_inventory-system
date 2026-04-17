@@ -69,6 +69,7 @@ def product_form(request, store_slug, pk=None):
 
         sup_id = data.get('supplier')
         product.supplier_id = sup_id if sup_id else None
+        product.available_for_preorder = data.get('available_for_preorder') == 'on'
         product.save()
 
         for f in request.FILES.getlist('images'):

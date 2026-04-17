@@ -8,7 +8,7 @@ urlpatterns = [
     path('', include('core.urls')),
     path('s/<slug:store_slug>/', include('inventory.urls')),
     path('s/<slug:store_slug>/sales/', include('sales.urls')),
-    path('s/<slug:store_slug>/preorder/', include('preorders.urls')),
+    path('s/<slug:store_slug>/preorders/', include('preorders.urls')),
     path('s/<slug:store_slug>/reports/', include('reports.urls')),
 ]
 
