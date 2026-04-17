@@ -3,9 +3,9 @@ from .base import *
 
 DEBUG = False
 DATABASES = database_config()
-ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "example.com,www.example.com")
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "example.com,www.example.com")
 CSRF_TRUSTED_ORIGINS = env_list(
-    "CSRF_TRUSTED_ORIGINS",
+    "DJANGO_CSRF_TRUSTED_ORIGINS",
     "https://example.com,https://www.example.com",
 )
 
