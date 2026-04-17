@@ -192,6 +192,23 @@
   </div>
 </div>
 
+<!-- Scan Quantity Modal -->
+<div class="modal-overlay" id="scanQtyModal">
+  <div class="modal-sheet" style="padding-bottom:calc(20px + env(safe-area-inset-bottom,0))">
+    <div class="modal-handle"></div>
+    <div id="scanQtyProductName" style="font-size:17px;font-weight:600;margin-bottom:2px;text-align:center"></div>
+    <div id="scanQtyProductPrice" style="font-size:14px;color:var(--accent);text-align:center;margin-bottom:16px"></div>
+    <label class="form-label" style="text-align:center;display:block">Quantity</label>
+    <input type="number" id="scanQtyInput" class="form-input" min="1" value="1"
+      inputmode="numeric" style="font-size:28px;font-weight:700;text-align:center;margin-bottom:14px"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();confirmScanQty();}">
+    <div style="display:flex;gap:8px">
+      <button type="button" class="btn btn-outline" style="flex:1" onclick="document.getElementById('scanQtyModal').classList.remove('open');document.getElementById('barcodeInput').focus()">Cancel</button>
+      <button type="button" class="btn btn-primary" style="flex:2" onclick="confirmScanQty()">Add to Cart</button>
+    </div>
+  </div>
+</div>
+
 <!-- Receipt Modal -->
 <div class="modal-overlay" id="receiptModal">
   <div class="modal-sheet" style="text-align:center">
@@ -505,16 +522,37 @@ function handleBarcodeKey(e) {
   }
 }
 
+let pendingScanProduct = null;
+
 function lookupBarcode(code) {
   const product = ALL_PRODUCTS.find(p => p.barcode === code);
   if (product) {
-    addProduct(product);
     flashBarcodeInput('success');
-    document.getElementById('barcodeInput').focus();
+    pendingScanProduct = product;
+    document.getElementById('scanQtyProductName').textContent = product.name;
+    document.getElementById('scanQtyProductPrice').textContent = CURRENCY + parseFloat(product.unit_price).toFixed(2) + ' / ' + product.unit_label;
+    const qtyInput = document.getElementById('scanQtyInput');
+    qtyInput.value = '1';
+    document.getElementById('scanQtyModal').classList.add('open');
+    setTimeout(() => { qtyInput.select(); qtyInput.focus(); }, 80);
   } else {
     flashBarcodeInput('error');
     showScanToast('Barcode not found: ' + code, true);
+    document.getElementById('barcodeInput').focus();
   }
+}
+
+function confirmScanQty() {
+  if (!pendingScanProduct) return;
+  const qty = Math.max(1, parseInt(document.getElementById('scanQtyInput').value) || 1);
+  const existing = cart.find(i => i.id === pendingScanProduct.id && i.type === 'product');
+  if (existing) { existing.quantity += qty; }
+  else { cart.push({ id: pendingScanProduct.id, name: pendingScanProduct.name, unit_price: parseFloat(pendingScanProduct.unit_price), quantity: qty, type: 'product' }); }
+  renderCart();
+  showScanToast(qty + '× ' + pendingScanProduct.name + ' added', false);
+  pendingScanProduct = null;
+  document.getElementById('scanQtyModal').classList.remove('open');
+  document.getElementById('barcodeInput').focus();
 }
 
 function flashBarcodeInput(type) {
