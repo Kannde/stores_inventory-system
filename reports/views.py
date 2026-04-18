@@ -8,6 +8,7 @@ from django.utils import timezone
 from core.views import get_store
 from sales.models import Sale, SaleItem
 from inventory.models import Product, Category
+from expenses.models import Expense
 
 
 @login_required
@@ -33,6 +34,18 @@ def dashboard(request, store_slug):
     )
     gross_profit = float(total_revenue) - total_cogs
     margin_pct = (gross_profit / float(total_revenue) * 100) if total_revenue else 0
+
+    # Operating expenses
+    total_expenses = float(
+        Expense.objects.filter(store=store, date__gte=start_date)
+        .aggregate(t=Sum('amount'))['t'] or 0
+    )
+    expenses_by_cat = list(
+        Expense.objects.filter(store=store, date__gte=start_date)
+        .values('category').annotate(total=Sum('amount')).order_by('-total')
+    )
+    net_profit = gross_profit - total_expenses
+    net_margin_pct = (net_profit / float(total_revenue) * 100) if total_revenue else 0
 
     top_products = sale_items.values('product__name', 'product__cost_price').annotate(
         total_qty=Sum('quantity'),
@@ -67,11 +80,13 @@ def dashboard(request, store_slug):
         ).select_related('product')
         rev = day_sales.aggregate(t=Sum('total_amount'))['t'] or 0
         cogs = sum(float(si.quantity) * float(si.product.cost_price) for si in day_items)
+        exp = float(Expense.objects.filter(store=store, date=d).aggregate(t=Sum('amount'))['t'] or 0)
         daily_data.append({
             'date': d.strftime('%b %d'),
             'revenue': float(rev),
             'cogs': round(cogs, 2),
-            'profit': round(float(rev) - cogs, 2),
+            'expenses': round(exp, 2),
+            'profit': round(float(rev) - cogs - exp, 2),
         })
 
     context = {
@@ -83,6 +98,10 @@ def dashboard(request, store_slug):
         'total_cogs': round(total_cogs, 2),
         'gross_profit': round(gross_profit, 2),
         'margin_pct': round(margin_pct, 1),
+        'total_expenses': round(total_expenses, 2),
+        'expenses_by_cat': expenses_by_cat,
+        'net_profit': round(net_profit, 2),
+        'net_margin_pct': round(net_margin_pct, 1),
         'avg_sale': float(total_revenue) / max(sales.count(), 1),
         'top_products': top_products_enriched,
         'category_breakdown': list(category_breakdown),

@@ -33,6 +33,21 @@
           {{ store.currency_symbol }}{{ gross_profit|floatformat:2 }}
         </div>
       </div>
+      <div style="padding:12px;background:var(--warning-light);border-radius:var(--radius)">
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">Operating Expenses</div>
+        <div style="font-size:20px;font-weight:700;color:var(--warning)">{{ store.currency_symbol }}{{ total_expenses|floatformat:2 }}</div>
+        {% if expenses_by_cat %}
+        <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
+          {% for row in expenses_by_cat %}<span style="font-size:10px;background:rgba(0,0,0,.08);border-radius:10px;padding:2px 7px">{{ row.category|title }} {{ store.currency_symbol }}{{ row.total|floatformat:0 }}</span>{% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      <div style="padding:12px;background:{% if net_profit >= 0 %}var(--accent-light){% else %}#fff0f0{% endif %};border-radius:var(--radius)">
+        <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">Net Profit · {{ net_margin_pct }}% margin</div>
+        <div style="font-size:24px;font-weight:700;color:{% if net_profit >= 0 %}var(--accent){% else %}var(--danger){% endif %}">
+          {{ store.currency_symbol }}{{ net_profit|floatformat:2 }}
+        </div>
+      </div>
     </div>
   </div>
 

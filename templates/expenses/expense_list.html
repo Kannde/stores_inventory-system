@@ -1,0 +1,245 @@
+{% extends 'base.html' %}
+{% block title %}Expenses — {{ store.name }}{% endblock %}
+
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'core:store_dashboard' store.slug %}" class="back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+  </a>
+  <h1>Expenses</h1>
+  <div class="topnav-actions">
+    <button type="button" class="action" onclick="openAddModal()">+ Add</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.cat-chip { padding:5px 12px; border-radius:20px; font-size:12px; font-weight:600; border:1.5px solid var(--border); background:var(--surface); color:var(--text-2); cursor:pointer; white-space:nowrap; }
+.cat-chip.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+.exp-row { display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid var(--border); }
+.exp-row:last-child { border-bottom:none; }
+.cat-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+</style>
+
+<div class="container" style="padding-bottom:100px">
+
+  <!-- Month picker -->
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+    <input type="month" id="monthPicker" value="{{ month }}"
+      class="form-input" style="flex:1;font-size:15px"
+      onchange="window.location.href='?month='+this.value+'{% if selected_cat %}&cat={{ selected_cat }}{% endif %}'">
+  </div>
+
+  <!-- Category filter chips -->
+  <div class="tabs" style="margin-bottom:14px">
+    <button class="cat-chip {% if not selected_cat %}active{% endif %}"
+      onclick="filterCat('')">All</button>
+    {% for val, label in category_choices %}
+    <button class="cat-chip {% if selected_cat == val %}active{% endif %}"
+      onclick="filterCat('{{ val }}')">{{ label }}</button>
+    {% endfor %}
+  </div>
+
+  <!-- Summary card -->
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span class="card-title">{{ month|slice:":4" }}-{{ month|slice:"5:" }} Total</span>
+      <span style="font-size:22px;font-weight:700;color:var(--danger)">{{ store.currency_symbol }}{{ total|floatformat:2 }}</span>
+    </div>
+    {% if by_category %}
+    <div style="display:flex;flex-direction:column;gap:6px">
+      {% for row in by_category %}
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="cat-dot" style="background:{{ row.category|slugify }}-color"></div>
+          <span>{{ row.category|title }}</span>
+        </div>
+        <span style="font-weight:600">{{ store.currency_symbol }}{{ row.total|floatformat:2 }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Expense list -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Entries</span>
+      <span style="font-size:13px;color:var(--text-3)">{{ expenses|length }} record{{ expenses|length|pluralize }}</span>
+    </div>
+    {% if expenses %}
+    {% for exp in expenses %}
+    <div class="exp-row">
+      <div class="cat-dot" style="background:var(--cat-{{ exp.category }},var(--accent))"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:500">{{ exp.get_category_display }}
+          {% if exp.product %}<span style="font-size:11px;color:var(--text-3)"> · {{ exp.product.name }}{% if exp.product_qty > 1 %} ×{{ exp.product_qty }}{% endif %}</span>{% endif %}
+        </div>
+        <div style="font-size:12px;color:var(--text-3)">
+          {{ exp.date|date:"d M Y" }}{% if exp.recorded_by %} · {{ exp.recorded_by.name }}{% endif %}
+          {% if exp.description %} · {{ exp.description }}{% endif %}
+        </div>
+      </div>
+      <div style="font-weight:600;color:var(--danger);flex-shrink:0">{{ store.currency_symbol }}{{ exp.amount|floatformat:2 }}</div>
+      <form method="post" action="{% url 'expenses:expense_delete' store.slug exp.pk %}" style="margin:0" onsubmit="return confirm('Delete this expense?')">
+        {% csrf_token %}
+        <button type="submit" style="background:none;border:none;color:var(--text-3);cursor:pointer;padding:4px;font-size:18px;line-height:1">×</button>
+      </form>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty" style="padding:32px 0">
+      <p>No expenses recorded for this period</p>
+      <button type="button" class="btn btn-primary btn-sm" style="margin-top:12px" onclick="openAddModal()">Add First Entry</button>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Add Expense Modal -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal-sheet" style="max-height:90vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <h2 style="font-size:18px;font-weight:600;margin-bottom:16px">Record Expense</h2>
+
+    <form method="post" action="{% url 'expenses:expense_add' store.slug %}" id="expenseForm">
+      {% csrf_token %}
+
+      <div class="form-group">
+        <label class="form-label">Category *</label>
+        <select name="category" id="categorySelect" class="form-select" onchange="handleCategoryChange(this.value)">
+          {% for val, label in category_choices %}
+          <option value="{{ val }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Product picker — shown for breakage / expiry -->
+      <div id="productSection" style="display:none">
+        <div class="form-group">
+          <label class="form-label">Product</label>
+          <select id="productSelect" name="product_id" class="form-select" onchange="handleProductSelect(this.value)">
+            <option value="">— Select product —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" id="qtyLabel">Quantity</label>
+          <input type="number" name="product_qty" id="productQty" class="form-input"
+            min="1" value="1" inputmode="numeric" onchange="recalcCost()">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Amount ({{ store.currency_symbol }}) *</label>
+        <input type="number" name="amount" id="amountInput" class="form-input"
+          step="0.01" inputmode="decimal" required style="font-size:20px;font-weight:700;text-align:center">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input type="text" name="description" class="form-input" placeholder="Optional details">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Date *</label>
+        <input type="date" name="date" id="dateInput" class="form-input" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Recorded By</label>
+        <select name="recorded_by" class="form-select">
+          <option value="">— Not specified —</option>
+          {% for s in staff %}
+          <option value="{{ s.id }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button type="button" class="btn btn-outline" style="flex:1" onclick="closeAddModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="flex:2">Save Expense</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PRODUCTS = {{ products_json|safe }};
+const CURRENCY = '{{ store.currency_symbol }}';
+
+// Category colours (CSS custom props fallback)
+const CAT_COLORS = {
+  salary:'#2563eb', transport:'#e07a1b', marketing:'#9333ea',
+  breakage:'#c1121f', expiry:'#dc2626', utilities:'#0891b2',
+  rent:'#059669', other:'#6b7280',
+};
+document.querySelectorAll('.cat-dot').forEach(dot => {
+  const cat = dot.closest('[data-cat]')?.dataset.cat;
+});
+
+// Set dot colours from inline style attribute pattern
+document.querySelectorAll('.exp-row .cat-dot').forEach((dot, i) => {
+  const cats = {{ expenses|length }};
+  // colours already set via inline style; this is a no-op placeholder
+});
+
+function filterCat(val) {
+  const month = document.getElementById('monthPicker').value;
+  window.location.href = '?month=' + month + (val ? '&cat=' + val : '');
+}
+
+function openAddModal() {
+  document.getElementById('dateInput').value = new Date().toISOString().slice(0,10);
+  document.getElementById('addModal').classList.add('open');
+}
+function closeAddModal() {
+  document.getElementById('addModal').classList.remove('open');
+}
+
+let selectedProduct = null;
+
+function handleCategoryChange(cat) {
+  const show = cat === 'breakage' || cat === 'expiry';
+  document.getElementById('productSection').style.display = show ? 'block' : 'none';
+  document.getElementById('qtyLabel').textContent = cat === 'expiry' ? 'Units Written Off' : 'Quantity Broken';
+  if (show) populateProductSelect(cat);
+  else { selectedProduct = null; }
+}
+
+function populateProductSelect(cat) {
+  const sel = document.getElementById('productSelect');
+  const today = new Date().toISOString().slice(0,10);
+  sel.innerHTML = '<option value="">— Select product —</option>' +
+    PRODUCTS.map(p => `<option value="${p.id}">${p.name} (cost: ${CURRENCY}${parseFloat(p.cost_price).toFixed(2)}/${p.unit_label})</option>`).join('');
+}
+
+function handleProductSelect(id) {
+  selectedProduct = PRODUCTS.find(p => p.id === id) || null;
+  recalcCost();
+}
+
+function recalcCost() {
+  if (!selectedProduct) return;
+  const qty = parseInt(document.getElementById('productQty').value) || 1;
+  const cost = parseFloat(selectedProduct.cost_price) * qty;
+  document.getElementById('amountInput').value = cost.toFixed(2);
+}
+
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+
+// Colour dots by category name from DOM
+document.querySelectorAll('.exp-row').forEach(row => {
+  const dot = row.querySelector('.cat-dot');
+  const text = row.querySelector('[style*="font-weight:500"]')?.textContent?.trim().toLowerCase();
+  // Use category value from data if available — otherwise leave default accent
+});
+</script>
+{% endblock %}
+
+{% block bottomnav %}{% with nav='expenses' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

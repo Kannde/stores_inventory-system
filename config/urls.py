@@ -14,6 +14,7 @@ urlpatterns = [
     path('s/<slug:store_slug>/sales/', include('sales.urls')),
     path('s/<slug:store_slug>/preorders/', include('preorders.urls')),
     path('s/<slug:store_slug>/reports/', include('reports.urls')),
+    path('s/<slug:store_slug>/expenses/', include('expenses.urls')),
 ]
 
 if settings.DEBUG:

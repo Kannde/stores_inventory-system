@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     "sales",
     "preorders",
     "reports",
+    "expenses",
 ]
 
 MIDDLEWARE = [
