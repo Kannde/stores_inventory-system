@@ -144,15 +144,10 @@ class Command(BaseCommand):
 
     def _seed(self, store, num_sales, num_days):
         # ── Staff ───────────────────────────────────────────────────────────
-        self.stdout.write("Creating staff...")
-        staff_members = list(StoreStaff.objects.filter(store=store, is_active=True))
+        self.stdout.write("Using existing staff...")
+        staff_members = list(StoreStaff.objects.filter(store=store))
         if not staff_members:
-            for i, name in enumerate(STAFF_NAMES):
-                s = StoreStaff.objects.create(
-                    store=store, name=name,
-                    role='manager' if i == 0 else 'sales', is_active=True,
-                )
-                staff_members.append(s)
+            staff_members = [None]  # sales.staff is nullable
 
         # ── Supplier ────────────────────────────────────────────────────────
         self.stdout.write("Creating suppliers...")
