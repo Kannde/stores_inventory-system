@@ -2,7 +2,12 @@
 __pycache__/
 *.py[cod]
 db.sqlite3
+
+# Environment files — never commit real secrets
 .env
+.env.*
+!.env.example
+
 *.log
 media/
 staticfiles/
