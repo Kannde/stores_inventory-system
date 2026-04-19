@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "preorders",
     "reports",
     "expenses",
+    "procurement",
 ]
 
 MIDDLEWARE = [

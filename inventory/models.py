@@ -11,6 +11,7 @@ class Category(models.Model):
     name = models.CharField(max_length=100)
     sort_order = models.IntegerField(default=0)
     expiry_warning_days = models.PositiveIntegerField(default=30, help_text='Days before expiry to show warning')
+    sku_prefix = models.CharField(max_length=5, blank=True, help_text='2-4 letter prefix for SKUs, e.g. BEV, CLN')
 
     class Meta:
         ordering = ['sort_order', 'name']
@@ -116,6 +117,7 @@ class Product(models.Model):
     reorder_level = models.IntegerField(default=5)
     expiry_date = models.DateField(null=True, blank=True)
     barcode = models.CharField(max_length=50, blank=True)
+    is_paid = models.BooleanField(default=True, help_text='False if stock was taken on credit from supplier')
     available_for_preorder = models.BooleanField(default=False)
     preorder_lead_days = models.PositiveIntegerField(null=True, blank=True, help_text='Expected days to fulfil a preorder for this product')
     is_active = models.BooleanField(default=True)

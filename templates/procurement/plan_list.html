@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}Procurement — {{ store.name }}{% endblock %}
+
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'core:store_dashboard' store.slug %}" class="back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+  </a>
+  <h1>Procurement</h1>
+  <a href="{% url 'procurement:plan_create' store.slug %}" class="action">+ New Plan</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-bottom:100px">
+
+  <!-- Status filter tabs -->
+  <div class="tabs">
+    <button class="tab {% if not status_filter %}active{% endif %}" onclick="filterStatus('')">All</button>
+    {% for val, label in status_choices %}
+    <button class="tab {% if status_filter == val %}active{% endif %}" onclick="filterStatus('{{ val }}')">{{ label }}</button>
+    {% endfor %}
+  </div>
+
+  {% if plans %}
+  {% for plan in plans %}
+  <a href="{% url 'procurement:plan_detail' store.slug plan.pk %}" style="text-decoration:none;color:inherit">
+    <div class="card" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div style="font-size:15px;font-weight:600;flex:1;margin-right:10px">{{ plan.title }}</div>
+        <span class="badge {% if plan.status == 'fulfilled' %}badge-success{% elif plan.status == 'cancelled' %}badge-danger{% elif plan.status == 'in_progress' %}badge-info{% elif plan.status == 'approved' %}badge-warning{% else %}badge-info{% endif %}">
+          {{ plan.get_status_display }}
+        </span>
+      </div>
+      <div style="display:flex;gap:16px;font-size:12px;color:var(--text-3)">
+        <span>📅 {{ plan.planned_date|date:"d M Y" }}</span>
+        <span>{{ plan.total_items }} item{{ plan.total_items|pluralize }}</span>
+        <span>Est. {{ store.currency_symbol }}{{ plan.estimated_cost|floatformat:2 }}</span>
+      </div>
+      {% if plan.notes %}
+      <div style="font-size:12px;color:var(--text-3);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ plan.notes }}</div>
+      {% endif %}
+    </div>
+  </a>
+  {% endfor %}
+  {% else %}
+  <div class="empty" style="padding:60px 0">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+    <p style="font-size:15px;font-weight:600;margin-bottom:4px">No procurement plans yet</p>
+    <p>Create a plan before your next buying trip</p>
+    <a href="{% url 'procurement:plan_create' store.slug %}" class="btn btn-primary btn-sm" style="margin-top:14px">Create First Plan</a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterStatus(val) {
+  window.location.href = '?status=' + val;
+}
+</script>
+{% endblock %}
+
+{% block bottomnav %}{% with nav='stock' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

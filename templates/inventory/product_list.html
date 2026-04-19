@@ -4,7 +4,10 @@
 <div class="topnav">
   <a href="{% url 'core:store_dashboard' store.slug %}" class="back">←</a>
   <h1>Products</h1>
-  <a href="{% url 'inventory:package_list' store.slug %}" class="action">Packages</a>
+  <div class="topnav-actions">
+    <a href="{% url 'inventory:bulk_upload' store.slug %}" class="action">Upload</a>
+    <a href="{% url 'inventory:package_list' store.slug %}" class="action">Packages</a>
+  </div>
 </div>
 {% endblock %}
 {% block content %}

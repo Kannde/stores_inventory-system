@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block title %}{{ plan.title }} — {{ store.name }}{% endblock %}
+
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'procurement:plan_list' store.slug %}" class="back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+  </a>
+  <h1 style="font-size:15px">{{ plan.title }}</h1>
+  {% if plan.status == 'draft' %}
+  <a href="{% url 'procurement:plan_edit' store.slug plan.pk %}" class="action">Edit</a>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-bottom:120px">
+
+  <!-- Plan header -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span class="badge {% if plan.status == 'fulfilled' %}badge-success{% elif plan.status == 'cancelled' %}badge-danger{% elif plan.status == 'in_progress' %}badge-info{% elif plan.status == 'approved' %}badge-warning{% else %}badge-info{% endif %}" style="font-size:12px">
+        {{ plan.get_status_display }}
+      </span>
+      <span style="font-size:13px;color:var(--text-3)">{{ plan.planned_date|date:"d M Y" }}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="stat" style="margin:0">
+        <div class="stat-label">Items</div>
+        <div class="stat-value">{{ plan.total_items }}</div>
+      </div>
+      <div class="stat" style="margin:0">
+        <div class="stat-label">Est. Cost</div>
+        <div class="stat-value accent">{{ store.currency_symbol }}{{ plan.estimated_cost|floatformat:2 }}</div>
+      </div>
+    </div>
+    {% if plan.notes %}
+    <div style="font-size:13px;color:var(--text-2);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">{{ plan.notes }}</div>
+    {% endif %}
+    {% if plan.fulfilled_at %}
+    <div style="font-size:12px;color:var(--accent);margin-top:8px">Fulfilled {{ plan.fulfilled_at|date:"d M Y, H:i" }}</div>
+    {% endif %}
+  </div>
+
+  <!-- Items list -->
+  <div class="card">
+    <div class="card-header" style="margin-bottom:8px">
+      <span class="card-title">Items ({{ plan.total_items }})</span>
+    </div>
+    {% for item in items %}
+    <div style="padding:12px 0;border-bottom:1px solid var(--border){% if forloop.last %};border-bottom:none{% endif %}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600">{{ item.display_name }}
+            {% if not item.product %}<span class="badge badge-info" style="font-size:9px;margin-left:4px">NEW</span>{% endif %}
+            {% if item.is_fulfilled %}<span class="badge badge-success" style="font-size:9px;margin-left:4px">✓</span>{% endif %}
+          </div>
+          {% if item.category %}<div style="font-size:11px;color:var(--text-3)">{{ item.category.name }}</div>{% endif %}
+          {% if item.supplier_name %}<div style="font-size:11px;color:var(--text-3)">{{ item.supplier_name }}{% if item.supplier_location %} · {{ item.supplier_location }}{% endif %}</div>{% endif %}
+          {% if item.product %}
+          <div style="font-size:11px;margin-top:3px">
+            <span style="color:{% if item.product.stock_qty <= 0 %}var(--danger){% elif item.product.stock_qty <= item.product.reorder_level %}var(--warning){% else %}var(--text-3){% endif %}">
+              Stock: {{ item.product.stock_qty }} {{ item.product.unit_label }}
+            </span>
+          </div>
+          {% endif %}
+        </div>
+        <div style="text-align:right;flex-shrink:0;margin-left:10px">
+          <div style="font-size:14px;font-weight:600">{{ item.planned_qty }}{% if item.actual_qty %} → {{ item.actual_qty }}{% endif %}</div>
+          <div style="font-size:12px;color:var(--text-3)">{{ store.currency_symbol }}{{ item.estimated_unit_cost|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Action buttons -->
+  {% if plan.status == 'draft' %}
+  <form method="post" action="{% url 'procurement:plan_status' store.slug plan.pk %}">
+    {% csrf_token %}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button name="action" value="cancel" class="btn btn-outline" onclick="return confirm('Cancel this plan?')">Cancel Plan</button>
+      <button name="action" value="approve" class="btn btn-primary">Approve Plan</button>
+    </div>
+  </form>
+  {% elif plan.status == 'approved' %}
+  <form method="post" action="{% url 'procurement:plan_status' store.slug plan.pk %}">
+    {% csrf_token %}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button name="action" value="cancel_ap" class="btn btn-outline" onclick="return confirm('Cancel this plan?')">Cancel</button>
+      <button name="action" value="start" class="btn btn-primary">Start Buying</button>
+    </div>
+  </form>
+  {% elif plan.status == 'in_progress' %}
+  <a href="{% url 'procurement:plan_fulfil' store.slug plan.pk %}" class="btn btn-primary btn-block" style="height:50px;font-size:16px;display:flex;align-items:center;justify-content:center">
+    Confirm Purchase & Add to Stock
+  </a>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block bottomnav %}{% with nav='stock' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

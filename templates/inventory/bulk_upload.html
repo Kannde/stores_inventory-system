@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% block title %}Bulk Upload — {{ store.name }}{% endblock %}
+
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'inventory:product_list' store.slug %}" class="back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+  </a>
+  <h1>Bulk Upload</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-bottom:40px">
+
+  <!-- Step 1: Download template -->
+  <div class="card">
+    <div class="card-header"><span class="card-title">Step 1 — Download Template</span></div>
+    <p style="font-size:14px;color:var(--text-2);margin-bottom:14px">
+      Download the Excel template, fill in your products, then upload it below.
+      Product Name and Unit Price are required. SKUs are auto-generated.
+    </p>
+    <a href="{% url 'inventory:download_template' store.slug %}" class="btn btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download Template (.xlsx)
+    </a>
+    <div style="margin-top:12px;font-size:12px;color:var(--text-3)">
+      <strong>Columns:</strong> Product Name, Category, Quantity, Unit Price, Cost Price, Unit Label, Supplier, Paid, Preorder, Reorder Level
+    </div>
+  </div>
+
+  <!-- Step 2: Upload -->
+  <div class="card">
+    <div class="card-header"><span class="card-title">Step 2 — Upload Filled Sheet</span></div>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="form-group">
+        <label class="form-label">Select Excel file (.xlsx)</label>
+        <input type="file" name="file" accept=".xlsx,.xls" class="form-input" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" style="height:48px;font-size:16px">
+        Upload & Import Products
+      </button>
+    </form>
+  </div>
+
+  <!-- Results -->
+  {% if results %}
+  <div class="card">
+    <div class="card-header"><span class="card-title">Upload Results</span></div>
+
+    {% if results.created %}
+    <div style="background:var(--accent-light);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px">
+      <div style="font-size:14px;font-weight:600;color:var(--accent-dark);margin-bottom:6px">
+        ✓ {{ results.created|length }} product{{ results.created|length|pluralize }} created
+      </div>
+      <a href="{% url 'inventory:product_list' store.slug %}" style="font-size:13px;color:var(--accent);font-weight:600">
+        View products →
+      </a>
+    </div>
+    {% endif %}
+
+    {% if results.warnings %}
+    <div style="background:var(--warning-light);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px">
+      <div style="font-size:13px;font-weight:600;color:var(--warning);margin-bottom:6px">
+        ⚠ {{ results.warnings|length }} warning{{ results.warnings|length|pluralize }}
+      </div>
+      {% for w in results.warnings %}
+      <div style="font-size:12px;color:var(--warning);margin-top:4px">{{ w }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if results.errors %}
+    <div style="background:var(--danger-light);border-radius:var(--radius-sm);padding:12px">
+      <div style="font-size:13px;font-weight:600;color:var(--danger);margin-bottom:6px">
+        ✗ {{ results.errors|length }} error{{ results.errors|length|pluralize }}
+      </div>
+      {% for e in results.errors %}
+      <div style="font-size:12px;color:var(--danger);margin-top:4px">{{ e }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if not results.created and not results.errors %}
+    <div class="empty"><p>No products were imported.</p></div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block bottomnav %}{% with nav='products' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

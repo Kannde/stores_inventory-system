@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block title %}Fulfil Plan — {{ store.name }}{% endblock %}
+
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'procurement:plan_detail' store.slug plan.pk %}" class="back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+  </a>
+  <h1 style="font-size:15px">Confirm Purchase</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.fulfil-card { background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius); padding:14px; margin-bottom:10px; }
+.fulfil-card.new-product { border-color:var(--info); background:var(--info-light); }
+.checkbox-row { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-2); margin-top:8px; }
+.checkbox-row input[type=checkbox] { width:18px; height:18px; accent-color:var(--accent); }
+</style>
+
+<div class="container" style="padding-bottom:120px">
+
+  <div class="card" style="background:var(--warning-light);border-color:var(--warning);margin-bottom:16px">
+    <div style="font-size:13px;color:var(--warning);font-weight:500">
+      Confirming will update stock levels and create products. This cannot be undone.
+    </div>
+  </div>
+
+  {% if errors %}
+  <div class="card" style="background:var(--danger-light);border-color:var(--danger);margin-bottom:16px">
+    {% for e in errors %}<div style="font-size:13px;color:var(--danger)">{{ e }}</div>{% endfor %}
+  </div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+
+    {% for item in items %}
+    <div class="fulfil-card {% if not item.product %}new-product{% endif %}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div>
+          <div style="font-size:15px;font-weight:600">{{ item.display_name }}</div>
+          {% if not item.product %}
+          <span class="badge badge-info" style="font-size:10px">New Product</span>
+          {% else %}
+          <div style="font-size:12px;color:var(--text-3)">Current stock: {{ item.product.stock_qty }} {{ item.product.unit_label }}</div>
+          {% endif %}
+        </div>
+        <div style="font-size:13px;color:var(--text-3)">Planned: {{ item.planned_qty }}</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Qty Purchased</label>
+          <input type="number" name="actual_qty_{{ item.pk }}" class="form-input"
+            value="{{ item.planned_qty }}" min="0" inputmode="numeric" style="text-align:center;font-size:18px;font-weight:700">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Unit Cost ({{ store.currency_symbol }})</label>
+          <input type="number" name="actual_cost_{{ item.pk }}" class="form-input"
+            value="{{ item.estimated_unit_cost }}" step="0.01" inputmode="decimal">
+        </div>
+      </div>
+
+      {% if not item.product %}
+      <div class="form-group" style="margin-bottom:8px;background:rgba(255,255,255,.6);padding:10px;border-radius:var(--radius-sm)">
+        <label class="form-label">Selling Price ({{ store.currency_symbol }}) *</label>
+        <input type="number" name="selling_price_{{ item.pk }}" class="form-input"
+          step="0.01" inputmode="decimal" required placeholder="Required for new products"
+          style="border-color:var(--info)">
+      </div>
+      {% endif %}
+
+      <div class="checkbox-row">
+        <input type="checkbox" name="is_paid_{{ item.pk }}" id="paid_{{ item.pk }}" checked>
+        <label for="paid_{{ item.pk }}">Paid</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" name="preorder_{{ item.pk }}" id="preorder_{{ item.pk }}" {% if item.available_for_preorder %}checked{% endif %}>
+        <label for="preorder_{{ item.pk }}">Available for preorder</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" name="fulfilled_{{ item.pk }}" id="recv_{{ item.pk }}" checked>
+        <label for="recv_{{ item.pk }}" style="font-weight:600">Received / Purchased</label>
+      </div>
+    </div>
+    {% endfor %}
+
+    <button type="submit" class="btn btn-primary btn-block" style="height:52px;font-size:16px;margin-top:6px">
+      Confirm & Add to Stock
+    </button>
+    <a href="{% url 'procurement:plan_detail' store.slug plan.pk %}" class="btn btn-outline btn-block" style="margin-top:8px">
+      Cancel
+    </a>
+  </form>
+
+</div>
+{% endblock %}
+
+{% block bottomnav %}{% with nav='stock' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

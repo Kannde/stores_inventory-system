@@ -27,6 +27,9 @@ urlpatterns = [
     path('suppliers/<uuid:pk>/toggle/', views.supplier_toggle, name='supplier_toggle'),
     # Barcode
     path('products/<uuid:pk>/barcode/', views.barcode_print, name='barcode_print'),
+    # Bulk upload
+    path('products/upload/', views.bulk_upload, name='bulk_upload'),
+    path('products/template/', views.download_template, name='download_template'),
     # API endpoints for AJAX
     path('api/products/', views.api_products, name='api_products'),
     path('api/packages/', views.api_packages, name='api_packages'),

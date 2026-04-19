@@ -1,9 +1,11 @@
+import io
 import json
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.utils.timezone import now
+from django.db import transaction
 from django.db.models import F, Q, Sum
 from core.views import get_store
 from .models import Category, Product, ProductImage, Package, PackageItem, StockMovement, Supplier, SupplierTransaction
@@ -73,6 +75,11 @@ def product_form(request, store_slug, pk=None):
         lead = data.get('preorder_lead_days', '').strip()
         product.preorder_lead_days = int(lead) if lead and lead.isdigit() else None
         product.save()
+
+        if not product.sku:
+            from .sku import generate_sku
+            product.sku = generate_sku(store, product.category, product.name)
+            product.save(update_fields=['sku'])
 
         for f in request.FILES.getlist('images'):
             ProductImage.objects.create(product=product, image=f)
@@ -335,3 +342,136 @@ def api_packages(request, store_slug):
         'items': [{'product': i.product.name, 'qty': i.quantity} for i in p.items.all()],
     } for p in packages]
     return JsonResponse(data, safe=False)
+
+
+@login_required
+def download_template(request, store_slug):
+    store = get_store(store_slug, request.user)
+    from .template_generator import generate_product_template
+    wb = generate_product_template(store)
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    response = HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{store.slug}_product_template.xlsx"'
+    return response
+
+
+@login_required
+def bulk_upload(request, store_slug):
+    store = get_store(store_slug, request.user)
+    results = None
+
+    if request.method == 'POST' and request.FILES.get('file'):
+        import openpyxl
+        from .sku import generate_sku
+
+        created, warnings, errors = [], [], []
+
+        try:
+            wb = openpyxl.load_workbook(request.FILES['file'], data_only=True)
+            ws = wb['Products'] if 'Products' in wb.sheetnames else wb.active
+        except Exception as e:
+            errors.append(f"Could not read file: {e}")
+            results = {'created': [], 'warnings': [], 'errors': errors}
+            return render(request, 'inventory/bulk_upload.html', {'store': store, 'results': results})
+
+        cat_map = {c.name.lower(): c for c in Category.objects.filter(store=store)}
+
+        try:
+            with transaction.atomic():
+                for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                    if not any(row):
+                        continue
+
+                    name = str(row[0]).strip() if row[0] else ''
+                    unit_price_raw = row[3]
+
+                    if not name:
+                        errors.append(f"Row {row_num}: Product name is required — skipped")
+                        continue
+                    if unit_price_raw is None or str(unit_price_raw).strip() == '':
+                        errors.append(f"Row {row_num}: Unit price is required for '{name}' — skipped")
+                        continue
+
+                    try:
+                        unit_price = float(unit_price_raw)
+                    except (ValueError, TypeError):
+                        errors.append(f"Row {row_num}: Invalid unit price '{unit_price_raw}' for '{name}' — skipped")
+                        continue
+
+                    cat_name = str(row[1]).strip().lower() if row[1] else ''
+                    category = None
+                    if cat_name:
+                        category = cat_map.get(cat_name)
+                        if not category:
+                            warnings.append(f"Row {row_num}: Category '{row[1]}' not found — product created without category")
+
+                    try:
+                        stock_qty = int(row[2]) if row[2] is not None else 0
+                    except (ValueError, TypeError):
+                        stock_qty = 0
+
+                    cost_price = 0
+                    try:
+                        if row[4] is not None:
+                            cost_price = float(row[4])
+                    except (ValueError, TypeError):
+                        pass
+
+                    unit_label = str(row[5]).strip() if row[5] else 'unit'
+                    supplier_name = str(row[6]).strip() if row[6] else ''
+
+                    paid_val = str(row[7]).strip().upper() if row[7] else 'YES'
+                    is_paid = paid_val != 'NO'
+
+                    preorder_val = str(row[8]).strip().upper() if row[8] else 'NO'
+                    available_for_preorder = preorder_val == 'YES'
+
+                    try:
+                        reorder_level = int(row[9]) if row[9] is not None else 5
+                    except (ValueError, TypeError):
+                        reorder_level = 5
+
+                    supplier_obj = None
+                    if supplier_name:
+                        supplier_obj, _ = Supplier.objects.get_or_create(
+                            store=store, name=supplier_name,
+                            defaults={'ownership': 'external'},
+                        )
+
+                    product = Product(
+                        store=store,
+                        category=category,
+                        supplier=supplier_obj,
+                        name=name,
+                        unit_price=unit_price,
+                        cost_price=cost_price,
+                        unit_label=unit_label,
+                        stock_qty=stock_qty,
+                        reorder_level=reorder_level,
+                        is_paid=is_paid,
+                        available_for_preorder=available_for_preorder,
+                    )
+                    product.save()
+
+                    product.sku = generate_sku(store, category, name)
+                    product.save(update_fields=['sku'])
+
+                    if stock_qty > 0:
+                        StockMovement.objects.create(
+                            product=product, movement_type='in',
+                            quantity=stock_qty, reason='Bulk upload',
+                        )
+
+                    created.append(name)
+
+        except Exception as e:
+            errors.append(f"Upload failed: {e}")
+
+        results = {'created': created, 'warnings': warnings, 'errors': errors}
+
+    return render(request, 'inventory/bulk_upload.html', {'store': store, 'results': results})

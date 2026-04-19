@@ -1,0 +1,256 @@
+{% extends 'base.html' %}
+{% block title %}{% if plan %}Edit Plan{% else %}New Plan{% endif %} — {{ store.name }}{% endblock %}
+
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'procurement:plan_list' store.slug %}" class="back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+  </a>
+  <h1>{% if plan %}Edit Plan{% else %}New Plan{% endif %}</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.item-row { background:var(--surface-2); border-radius:var(--radius-sm); padding:12px; margin-bottom:10px; position:relative; }
+.item-row .remove-btn { position:absolute; top:8px; right:8px; background:none; border:none; color:var(--danger); font-size:18px; cursor:pointer; }
+.product-suggestions { position:absolute; left:0; right:0; background:var(--surface); border:1.5px solid var(--accent); border-radius:var(--radius-sm); z-index:50; max-height:200px; overflow-y:auto; box-shadow:var(--shadow-lg); }
+.product-suggestion { padding:10px 14px; cursor:pointer; font-size:14px; border-bottom:1px solid var(--border); }
+.product-suggestion:last-child { border-bottom:none; }
+.product-suggestion:hover { background:var(--accent-light); }
+.product-suggestion .stock-badge { font-size:11px; color:var(--text-3); float:right; }
+</style>
+
+<div class="container" style="padding-bottom:120px">
+
+  {% if error %}
+  <div class="alert error">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" id="planForm">
+    {% csrf_token %}
+
+    <!-- Plan info -->
+    <div class="card">
+      <div class="card-title" style="margin-bottom:14px">Plan Details</div>
+      <div class="form-group">
+        <label class="form-label">Plan Title *</label>
+        <input type="text" name="title" class="form-input" required placeholder="e.g. Weekly Restock — Beverages" value="{{ plan.title|default:'' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Planned Date *</label>
+        <input type="date" name="planned_date" class="form-input" required value="{{ plan.planned_date|date:'Y-m-d'|default:'' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea name="notes" class="form-textarea" rows="2" placeholder="Optional notes...">{{ plan.notes|default:'' }}</textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Created By</label>
+        <select name="created_by" class="form-select">
+          <option value="">— Not specified —</option>
+          {% for s in staff %}
+          <option value="{{ s.id }}" {% if plan.created_by_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- Items -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <span class="card-title">Items</span>
+        <button type="button" class="btn btn-outline btn-sm" onclick="addItemRow()">+ Add Item</button>
+      </div>
+      <div id="itemsContainer">
+        {% if plan %}
+          {% for item in plan.items.all %}
+          <div class="item-row" data-index="{{ forloop.counter0 }}">
+            <button type="button" class="remove-btn" onclick="removeRow(this)">×</button>
+            <input type="hidden" name="item_product_id" value="{{ item.product.id|default:'' }}">
+            <div class="form-group" style="margin-bottom:8px">
+              <label class="form-label">Product</label>
+              <div style="position:relative">
+                <input type="text" class="form-input product-search" placeholder="Search existing or type new product name..."
+                  value="{{ item.display_name }}" data-product-id="{{ item.product.id|default:'' }}" autocomplete="off">
+                <div class="product-suggestions" style="display:none"></div>
+              </div>
+              <input type="hidden" name="item_name" value="{{ item.display_name }}">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+              <div class="form-group" style="margin-bottom:0">
+                <label class="form-label">Category</label>
+                <select name="item_category_id" class="form-select">
+                  <option value="">—</option>
+                  {% for cat in categories %}
+                  <option value="{{ cat.id }}" {% if item.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="form-group" style="margin-bottom:0">
+                <label class="form-label">Qty</label>
+                <input type="number" name="item_qty" class="form-input" min="1" value="{{ item.planned_qty }}">
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div class="form-group" style="margin-bottom:0">
+                <label class="form-label">Est. Cost ({{ store.currency_symbol }})</label>
+                <input type="number" name="item_cost" class="form-input" step="0.01" value="{{ item.estimated_unit_cost }}">
+              </div>
+              <div class="form-group" style="margin-bottom:0">
+                <label class="form-label">Supplier</label>
+                <input type="text" name="item_supplier" class="form-input" value="{{ item.supplier_name }}">
+              </div>
+            </div>
+            <div class="form-group" style="margin-bottom:0;margin-top:8px">
+              <label class="form-label">Supplier Location</label>
+              <input type="text" name="item_location" class="form-input" value="{{ item.supplier_location }}">
+            </div>
+            {% if item.product %}
+            <div style="font-size:12px;color:var(--text-3);margin-top:6px">Current stock: <strong>{{ item.product.stock_qty }} {{ item.product.unit_label }}</strong></div>
+            {% endif %}
+          </div>
+          {% empty %}
+          <!-- empty — js will add first row -->
+          {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block" style="height:50px;font-size:16px">
+      {% if plan %}Update Plan{% else %}Save as Draft{% endif %}
+    </button>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const STORE_SLUG = '{{ store.slug }}';
+const CATEGORIES = [
+  {% for cat in categories %}
+  { id: '{{ cat.id }}', name: '{{ cat.name|escapejs }}' },
+  {% endfor %}
+];
+let rowIndex = {{ plan.items.count|default:0 }};
+
+function catOptions(selectedId) {
+  return '<option value="">—</option>' +
+    CATEGORIES.map(c => `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${c.name}</option>`).join('');
+}
+
+function addItemRow(data) {
+  data = data || {};
+  const idx = rowIndex++;
+  const html = `
+  <div class="item-row" data-index="${idx}">
+    <button type="button" class="remove-btn" onclick="removeRow(this)">×</button>
+    <input type="hidden" name="item_product_id" value="${data.product_id || ''}">
+    <div class="form-group" style="margin-bottom:8px">
+      <label class="form-label">Product</label>
+      <div style="position:relative">
+        <input type="text" class="form-input product-search" placeholder="Search existing or type new product name..."
+          value="${data.name || ''}" data-product-id="${data.product_id || ''}" autocomplete="off">
+        <div class="product-suggestions" style="display:none"></div>
+      </div>
+      <input type="hidden" name="item_name" value="${data.name || ''}">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Category</label>
+        <select name="item_category_id" class="form-select">${catOptions(data.category_id || '')}</select>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Qty</label>
+        <input type="number" name="item_qty" class="form-input" min="1" value="${data.qty || 1}">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Est. Cost ({{ store.currency_symbol }})</label>
+        <input type="number" name="item_cost" class="form-input" step="0.01" value="${data.cost || ''}">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Supplier</label>
+        <input type="text" name="item_supplier" class="form-input" value="${data.supplier || ''}">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:0;margin-top:8px">
+      <label class="form-label">Supplier Location</label>
+      <input type="text" name="item_location" class="form-input" value="${data.location || ''}">
+    </div>
+    ${data.stock !== undefined ? `<div style="font-size:12px;color:var(--text-3);margin-top:6px">Current stock: <strong>${data.stock} ${data.unit_label || 'unit'}</strong></div>` : ''}
+  </div>`;
+  document.getElementById('itemsContainer').insertAdjacentHTML('beforeend', html);
+  attachSearchListeners();
+}
+
+function removeRow(btn) {
+  btn.closest('.item-row').remove();
+}
+
+let debounceTimer = null;
+function attachSearchListeners() {
+  document.querySelectorAll('.product-search').forEach(input => {
+    if (input._searchAttached) return;
+    input._searchAttached = true;
+
+    input.addEventListener('input', function() {
+      const row = this.closest('.item-row');
+      const sugBox = row.querySelector('.product-suggestions');
+      const nameHidden = row.querySelector('input[name="item_name"]');
+      const pidHidden = row.querySelector('input[name="item_product_id"]');
+      const q = this.value.trim();
+
+      nameHidden.value = q;
+      pidHidden.value = '';
+
+      clearTimeout(debounceTimer);
+      if (q.length < 1) { sugBox.style.display = 'none'; return; }
+      debounceTimer = setTimeout(() => {
+        fetch(`/s/${STORE_SLUG}/api/products/?q=${encodeURIComponent(q)}`)
+          .then(r => r.json())
+          .then(data => {
+            if (!data.length) { sugBox.style.display = 'none'; return; }
+            sugBox.innerHTML = data.slice(0,8).map(p =>
+              `<div class="product-suggestion" data-id="${p.id}" data-name="${p.name}" data-cost="${p.cost_price}" data-stock="${p.stock_qty}" data-unit="${p.unit_label}" data-cat="${p.category_id || ''}">
+                ${p.name} <span class="stock-badge">${p.stock_qty} ${p.unit_label}</span>
+              </div>`
+            ).join('');
+            sugBox.style.display = 'block';
+            sugBox.querySelectorAll('.product-suggestion').forEach(item => {
+              item.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                const row = input.closest('.item-row');
+                input.value = this.dataset.name;
+                row.querySelector('input[name="item_name"]').value = this.dataset.name;
+                row.querySelector('input[name="item_product_id"]').value = this.dataset.id;
+                row.querySelector('input[name="item_cost"]').value = this.dataset.cost;
+                const catSel = row.querySelector('select[name="item_category_id"]');
+                if (this.dataset.cat) catSel.value = this.dataset.cat;
+                // Show stock
+                let stockDiv = row.querySelector('.stock-info');
+                if (!stockDiv) { stockDiv = document.createElement('div'); stockDiv.className = 'stock-info'; stockDiv.style.cssText = 'font-size:12px;color:var(--text-3);margin-top:6px'; row.appendChild(stockDiv); }
+                stockDiv.textContent = `Current stock: ${this.dataset.stock} ${this.dataset.unit}`;
+                sugBox.style.display = 'none';
+              });
+            });
+          });
+      }, 250);
+    });
+
+    input.addEventListener('blur', () => {
+      setTimeout(() => { input.closest('.item-row').querySelector('.product-suggestions').style.display = 'none'; }, 200);
+    });
+  });
+}
+
+// Add first row if new plan with no items
+{% if not plan or plan.items.count == 0 %}
+addItemRow();
+{% endif %}
+attachSearchListeners();
+</script>
+{% endblock %}
+
+{% block bottomnav %}{% with nav='stock' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

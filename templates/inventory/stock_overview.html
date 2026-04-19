@@ -4,6 +4,7 @@
 <div class="topnav">
   <a href="{% url 'core:store_dashboard' store.slug %}" class="back">←</a>
   <h1>Stock Overview</h1>
+  <a href="{% url 'procurement:plan_create' store.slug %}" class="action">Plan Restock</a>
 </div>
 {% endblock %}
 {% block content %}
