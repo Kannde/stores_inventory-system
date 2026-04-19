@@ -201,11 +201,9 @@ def store_dashboard(request, store_slug):
     today = timezone.now().date()
 
     from django.db.models import ExpressionWrapper, DecimalField
-    from django.db.models.functions import Coalesce
-    from inventory.models import Product, Category
+    from inventory.models import Product, Category, Supplier
     from preorders.models import PreOrder, PreOrderItem
     from sales.models import Sale, CreditAccount, SaleItem
-    from procurement.models import ProcurementItem
     from core.date_filter import resolve_period, parse_entity_filters
 
     pf = resolve_period(request, today, default='this_week')
@@ -255,15 +253,9 @@ def store_dashboard(request, store_slug):
         total=Sum(ExpressionWrapper(F('total_amount') - F('amount_paid'), output_field=DecimalField()))
     )['total'] or 0
 
-    supplier_debt = ProcurementItem.objects.filter(
-        plan__store=store, is_fulfilled=True, is_paid=False,
-    ).aggregate(
-        total=Sum(ExpressionWrapper(
-            Coalesce(F('actual_qty'), F('planned_qty')) *
-            Coalesce(F('actual_unit_cost'), F('estimated_unit_cost')),
-            output_field=DecimalField()
-        ))
-    )['total'] or 0
+    supplier_debt = Supplier.objects.filter(
+        store=store, is_active=True, outstanding_balance__gt=0,
+    ).aggregate(total=Sum('outstanding_balance'))['total'] or 0
 
     _po_expr = ExpressionWrapper(F('quantity') * F('unit_price'), output_field=DecimalField())
     preorder_obligation = PreOrderItem.objects.filter(
