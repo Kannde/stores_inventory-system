@@ -1,6 +1,6 @@
 from django.db import transaction
 from django.utils import timezone
-from inventory.models import StockMovement, Supplier
+from inventory.models import StockMovement, Supplier, SupplierTransaction
 from inventory.sku import generate_sku
 
 
@@ -38,10 +38,8 @@ def fulfil_plan(plan):
             cost = item.actual_unit_cost or item.estimated_unit_cost
             supplier_obj = None
             if item.supplier_name:
-                supplier_obj, _ = Supplier.objects.get_or_create(
-                    store=plan.store, name=item.supplier_name,
-                    defaults={'ownership': 'external'},
-                )
+                from inventory.views import _find_or_create_supplier
+                supplier_obj, _ = _find_or_create_supplier(plan.store, item.supplier_name)
 
             from inventory.models import Product
             prod = Product(
@@ -65,6 +63,18 @@ def fulfil_plan(plan):
                 reason=f'Procurement: {plan.title}',
                 reference=str(plan.id),
             )
+
+            # Record supplier debt for unpaid procurement stock
+            if not item.is_paid and supplier_obj:
+                cost_total = float(cost or 0) * qty
+                if cost_total > 0:
+                    SupplierTransaction.objects.create(
+                        supplier=supplier_obj,
+                        tx_type='purchase',
+                        amount=cost_total,
+                        description=f'Stock on credit: {item.new_product_name} (procurement: {plan.title})',
+                        date=timezone.now().date(),
+                    )
 
             item.product = prod
             item.save(update_fields=['product'])

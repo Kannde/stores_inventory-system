@@ -12,7 +12,8 @@ HEADERS = [
     ('Unit Price *', 14),
     ('Cost Price', 14),
     ('Unit Label', 14),
-    ('Supplier', 22),
+    ('Supplier Name', 22),
+    ('Supplier Phone', 18),
     ('Paid (YES/NO)', 14),
     ('Preorder (YES/NO)', 18),
     ('Reorder Level', 14),
@@ -38,17 +39,24 @@ def generate_product_template(store):
 
     ws.freeze_panes = 'A2'
 
-    # YES/NO validation for Paid (col 8) and Preorder (col 9)
+    # YES/NO validation for Paid (col 9) and Preorder (col 10)
     yn_dv = DataValidation(type='list', formula1='"YES,NO"', allow_blank=True)
-    yn_dv.sqref = 'H2:I1048576'
+    yn_dv.sqref = 'I2:J1048576'
     ws.add_data_validation(yn_dv)
 
     # Default values in sample row
     ws.cell(row=2, column=3, value=0)
     ws.cell(row=2, column=6, value='unit')
-    ws.cell(row=2, column=8, value='YES')
-    ws.cell(row=2, column=9, value='NO')
-    ws.cell(row=2, column=10, value=5)
+    ws.cell(row=2, column=9, value='YES')
+    ws.cell(row=2, column=10, value='NO')
+    ws.cell(row=2, column=11, value=5)
+
+    # Note on Supplier Phone column
+    phone_comment = Comment(
+        'If Paid = NO, Supplier Name is required.\nPhone helps identify existing suppliers.',
+        'SalesApp'
+    )
+    ws['H1'].comment = phone_comment
 
     # Instruction comment on A1
     comment = Comment(

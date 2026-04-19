@@ -46,15 +46,60 @@
           {% endif %}
         </select>
       </div>
+      {% if error %}
+      <div style="background:var(--danger-light);border:1px solid var(--danger);border-radius:var(--radius);padding:10px 12px;margin-bottom:10px;font-size:13px;color:var(--danger)">
+        {{ error }}
+      </div>
+      {% endif %}
+
+      <!-- Credit toggle -->
       <div class="form-group">
-        <label class="form-label">Supplier</label>
-        <select name="supplier" class="form-select">
-          <option value="">-- No Supplier --</option>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+          <input type="checkbox" name="is_paid" id="isPaidToggle"
+            {% if not product or product.is_paid %}checked{% endif %}
+            style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0"
+            onchange="toggleCreditSection(this)">
+          <div>
+            <div style="font-size:14px;font-weight:600">Paid to supplier</div>
+            <div style="font-size:12px;color:var(--text-3)">Uncheck if this stock was taken on credit</div>
+          </div>
+        </label>
+      </div>
+
+      <!-- Credit warning + supplier required -->
+      <div id="creditSection" style="display:{% if product and not product.is_paid %}block{% else %}none{% endif %}">
+        <div style="background:var(--warning-light);border:1px solid var(--warning);border-radius:var(--radius);padding:10px 12px;margin-bottom:10px;font-size:13px;color:var(--warning)">
+          ⚠ Stock on credit — a supplier is required so the debt is tracked.
+        </div>
+      </div>
+
+      <div class="form-group" id="supplierRow">
+        <label class="form-label" id="supplierLabel">Supplier</label>
+        <select name="supplier" id="supplierSelect" class="form-select" onchange="toggleNewSupplier(this)">
+          <option value="">-- Select Supplier --</option>
           {% for s in suppliers %}
-          <option value="{{ s.id }}" {% if product.supplier_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+          <option value="{{ s.id }}" {% if product and product.supplier_id == s.id %}selected{% endif %}>
+            {{ s.name }}{% if s.phone %} · {{ s.phone }}{% endif %}
+          </option>
           {% endfor %}
+          <option value="__new__">+ Add new supplier…</option>
         </select>
       </div>
+
+      <!-- Inline new supplier form -->
+      <div id="newSupplierSection" style="display:none;background:var(--surface-2);border-radius:var(--radius);padding:12px;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">New Supplier</div>
+        <div class="form-group" style="margin-bottom:8px">
+          <label class="form-label">Supplier Name *</label>
+          <input type="text" name="new_supplier_name" id="newSupplierName" class="form-input" placeholder="e.g. Kwame Distributors">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Phone Number</label>
+          <input type="tel" name="new_supplier_phone" id="newSupplierPhone" class="form-input" placeholder="e.g. 0241234567">
+          <div style="font-size:11px;color:var(--text-3);margin-top:3px">Used to identify this supplier if they already exist</div>
+        </div>
+      </div>
+
       <div class="form-group">
         <label class="form-label">Description</label>
         <textarea name="description" class="form-textarea">{{ product.description|default:'' }}</textarea>
@@ -144,6 +189,39 @@
 function toggleLeadDays(cb) {
   document.getElementById('leadDaysSection').style.display = cb.checked ? 'block' : 'none';
 }
+
+function toggleCreditSection(cb) {
+  const credit = document.getElementById('creditSection');
+  const label  = document.getElementById('supplierLabel');
+  credit.style.display = cb.checked ? 'none' : 'block';
+  label.textContent = cb.checked ? 'Supplier' : 'Supplier *';
+  if (cb.checked) {
+    // reset new supplier section when toggling back to paid
+    document.getElementById('supplierSelect').value = '';
+    document.getElementById('newSupplierSection').style.display = 'none';
+  }
+}
+
+function toggleNewSupplier(sel) {
+  const ns = document.getElementById('newSupplierSection');
+  if (sel.value === '__new__') {
+    ns.style.display = 'block';
+    document.getElementById('newSupplierName').focus();
+  } else {
+    ns.style.display = 'none';
+  }
+}
+
+// On load: set label correctly
+(function() {
+  const paid = document.getElementById('isPaidToggle');
+  document.getElementById('supplierLabel').textContent = paid.checked ? 'Supplier' : 'Supplier *';
+  // Restore new supplier section if it was open (e.g. form re-render after error)
+  const sel = document.getElementById('supplierSelect');
+  if (sel.value === '__new__') {
+    document.getElementById('newSupplierSection').style.display = 'block';
+  }
+})();
 </script>
 {% if product and product.barcode %}
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>

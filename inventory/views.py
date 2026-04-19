@@ -11,6 +11,27 @@ from core.views import get_store
 from .models import Category, Product, ProductImage, Package, PackageItem, StockMovement, Supplier, SupplierTransaction
 
 
+def _find_or_create_supplier(store, name, phone=''):
+    """Match supplier by name+phone; create if not found."""
+    name = name.strip()
+    phone = (phone or '').strip()
+    qs = Supplier.objects.filter(store=store)
+    if phone:
+        supplier = qs.filter(name__iexact=name, phone=phone).first()
+        if supplier:
+            return supplier, False
+    supplier = qs.filter(name__iexact=name).first()
+    if supplier:
+        if phone and not supplier.phone:
+            supplier.phone = phone
+            supplier.save(update_fields=['phone'])
+        return supplier, False
+    supplier = Supplier.objects.create(
+        store=store, name=name, phone=phone, ownership='external',
+    )
+    return supplier, True
+
+
 @login_required
 def product_list(request, store_slug):
     store = get_store(store_slug, request.user)
@@ -42,8 +63,10 @@ def product_form(request, store_slug, pk=None):
 
     if request.method == 'POST':
         data = request.POST
-        if product is None:
+        is_new = product is None
+        if is_new:
             product = Product(store=store)
+
         product.name = data['name']
         product.sku = data.get('sku', '')
         product.description = data.get('description', '')
@@ -54,8 +77,9 @@ def product_form(request, store_slug, pk=None):
         product.reorder_level = data.get('reorder_level', 5) or 5
         expiry = data.get('expiry_date', '').strip()
         product.expiry_date = expiry if expiry else None
+        product.is_paid = data.get('is_paid') == 'on'
 
-        # Category: may be existing ID or a new standard category name
+        # Category
         cat_val = data.get('category', '').strip()
         if cat_val:
             try:
@@ -63,14 +87,34 @@ def product_form(request, store_slug, pk=None):
                 _uuid.UUID(cat_val)
                 product.category_id = cat_val
             except ValueError:
-                # It's a name from standard categories — create it
                 cat_obj, _ = Category.objects.get_or_create(store=store, name=cat_val)
                 product.category = cat_obj
         else:
             product.category = None
 
-        sup_id = data.get('supplier')
-        product.supplier_id = sup_id if sup_id else None
+        # Supplier — required when stock is on credit
+        sup_id = data.get('supplier', '').strip()
+        new_sup_name = data.get('new_supplier_name', '').strip()
+        new_sup_phone = data.get('new_supplier_phone', '').strip()
+
+        if not product.is_paid:
+            if sup_id:
+                product.supplier_id = sup_id
+            elif new_sup_name:
+                sup_obj, _ = _find_or_create_supplier(store, new_sup_name, new_sup_phone)
+                product.supplier = sup_obj
+            else:
+                return render(request, 'inventory/product_form.html', {
+                    'store': store, 'product': product,
+                    'store_categories': store_categories,
+                    'standard_categories': [c for c in STANDARD_RETAIL_CATEGORIES
+                                            if c not in set(store_categories.values_list('name', flat=True))],
+                    'suppliers': suppliers,
+                    'error': 'A supplier is required for stock taken on credit.',
+                })
+        else:
+            product.supplier_id = sup_id if sup_id else None
+
         product.available_for_preorder = data.get('available_for_preorder') == 'on'
         lead = data.get('preorder_lead_days', '').strip()
         product.preorder_lead_days = int(lead) if lead and lead.isdigit() else None
@@ -80,6 +124,19 @@ def product_form(request, store_slug, pk=None):
             from .sku import generate_sku
             product.sku = generate_sku(store, product.category, product.name)
             product.save(update_fields=['sku'])
+
+        # Record supplier debt when new product added on credit
+        if is_new and not product.is_paid and product.supplier:
+            cost_total = float(product.cost_price) * max(int(product.stock_qty), 1)
+            if cost_total > 0:
+                from django.utils.timezone import now as _now
+                SupplierTransaction.objects.create(
+                    supplier=product.supplier,
+                    tx_type='purchase',
+                    amount=cost_total,
+                    description=f'Stock on credit: {product.name}',
+                    date=_now().date(),
+                )
 
         for f in request.FILES.getlist('images'):
             ProductImage.objects.create(product=product, image=f)
@@ -426,24 +483,27 @@ def bulk_upload(request, store_slug):
 
                     unit_label = str(row[5]).strip() if row[5] else 'unit'
                     supplier_name = str(row[6]).strip() if row[6] else ''
+                    supplier_phone = str(row[7]).strip() if row[7] else ''
 
-                    paid_val = str(row[7]).strip().upper() if row[7] else 'YES'
+                    paid_val = str(row[8]).strip().upper() if row[8] else 'YES'
                     is_paid = paid_val != 'NO'
 
-                    preorder_val = str(row[8]).strip().upper() if row[8] else 'NO'
+                    preorder_val = str(row[9]).strip().upper() if row[9] else 'NO'
                     available_for_preorder = preorder_val == 'YES'
 
                     try:
-                        reorder_level = int(row[9]) if row[9] is not None else 5
+                        reorder_level = int(row[10]) if row[10] is not None else 5
                     except (ValueError, TypeError):
                         reorder_level = 5
 
+                    # Unpaid stock requires a supplier
+                    if not is_paid and not supplier_name:
+                        errors.append(f"Row {row_num}: '{name}' is marked unpaid — Supplier Name is required. Skipped.")
+                        continue
+
                     supplier_obj = None
                     if supplier_name:
-                        supplier_obj, _ = Supplier.objects.get_or_create(
-                            store=store, name=supplier_name,
-                            defaults={'ownership': 'external'},
-                        )
+                        supplier_obj, _ = _find_or_create_supplier(store, supplier_name, supplier_phone)
 
                     product = Product(
                         store=store,
@@ -468,6 +528,19 @@ def bulk_upload(request, store_slug):
                             product=product, movement_type='in',
                             quantity=stock_qty, reason='Bulk upload',
                         )
+
+                    # Record supplier debt for unpaid stock
+                    if not is_paid and supplier_obj:
+                        cost_total = cost_price * max(stock_qty, 1)
+                        if cost_total > 0:
+                            from django.utils import timezone as _tz
+                            SupplierTransaction.objects.create(
+                                supplier=supplier_obj,
+                                tx_type='purchase',
+                                amount=cost_total,
+                                description=f'Stock on credit (bulk upload): {name}',
+                                date=_tz.now().date(),
+                            )
 
                     created.append(name)
 
