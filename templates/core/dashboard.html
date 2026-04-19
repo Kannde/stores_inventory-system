@@ -15,7 +15,7 @@
 {% endblock %}
 {% block content %}
 <div class="container">
-  <div class="card">
+  <div class="card" style="padding-bottom:4px">
     <div class="card-header" style="margin-bottom:0">
       <div>
         <div class="card-title">{{ store.name }}</div>
@@ -30,22 +30,21 @@
     </div>
   </div>
 
+  {% include 'includes/report_filters.html' %}
+
+  <!-- Period stats -->
   <div class="stats">
-    <div class="stat">
-      <div class="stat-label">Today's Revenue</div>
-      <div class="stat-value accent">{{ store.currency_symbol }}{{ today_revenue|floatformat:2 }}</div>
+    <div class="stat" style="grid-column:span 2">
+      <div class="stat-label">Revenue</div>
+      <div class="stat-value accent">{{ store.currency_symbol }}{{ period_revenue|floatformat:2 }}</div>
     </div>
     <div class="stat">
-      <div class="stat-label">Today's Sales</div>
-      <div class="stat-value">{{ today_count }}</div>
+      <div class="stat-label">Sales</div>
+      <div class="stat-value">{{ period_count }}</div>
     </div>
     <div class="stat">
-      <div class="stat-label">This Week</div>
-      <div class="stat-value accent">{{ store.currency_symbol }}{{ week_revenue|floatformat:2 }}</div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">Week Sales</div>
-      <div class="stat-value">{{ week_count }}</div>
+      <div class="stat-label">Avg Sale</div>
+      <div class="stat-value accent">{{ store.currency_symbol }}{{ avg_sale|floatformat:2 }}</div>
     </div>
   </div>
 
@@ -65,6 +64,26 @@
     <div class="stat">
       <div class="stat-label">Pre-orders</div>
       <div class="stat-value">{{ pending_preorders }}</div>
+    </div>
+  </div>
+
+  <!-- Credit overview row -->
+  <div class="stats">
+    <a href="{% url 'sales:credit_list' store.slug %}" class="stat" style="text-decoration:none;color:inherit">
+      <div class="stat-label">Receivables</div>
+      <div class="stat-value accent">{{ store.currency_symbol }}{{ total_receivables|floatformat:2 }}</div>
+    </a>
+    <div class="stat">
+      <div class="stat-label">Owed to Suppliers</div>
+      <div class="stat-value danger">{{ store.currency_symbol }}{{ supplier_debt|floatformat:2 }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Pre-order Backlog</div>
+      <div class="stat-value danger">{{ store.currency_symbol }}{{ preorder_obligation|floatformat:2 }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Net Credit</div>
+      <div class="stat-value {% if net_credit >= 0 %}accent{% else %}danger{% endif %}">{{ store.currency_symbol }}{{ net_credit|floatformat:2 }}</div>
     </div>
   </div>
 

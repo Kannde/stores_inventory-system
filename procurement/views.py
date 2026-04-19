@@ -147,8 +147,10 @@ def plan_detail(request, store_slug, pk):
     store = get_store(store_slug, request.user)
     plan = get_object_or_404(ProcurementPlan, pk=pk, store=store)
     items = plan.items.select_related('product', 'category').all()
+    fulfil_result = request.session.pop('fulfil_result', None)
     return render(request, 'procurement/plan_detail.html', {
         'store': store, 'plan': plan, 'items': items,
+        'fulfil_result': fulfil_result,
     })
 
 
@@ -197,6 +199,7 @@ def plan_fulfil(request, store_slug, pk):
 
         from .services import fulfil_plan
         result = fulfil_plan(plan)
+        request.session['fulfil_result'] = result
         return redirect('procurement:plan_detail', store_slug=store.slug, pk=pk)
 
     return render(request, 'procurement/plan_fulfil.html', {

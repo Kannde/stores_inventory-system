@@ -1,4 +1,3 @@
-from datetime import timedelta
 
 from django.contrib import messages
 from django.views.decorators.cache import never_cache
@@ -200,31 +199,108 @@ def admin_logs(request):
 def store_dashboard(request, store_slug):
     store = get_store(store_slug, request.user)
     today = timezone.now().date()
-    week_ago = today - timedelta(days=7)
 
-    from inventory.models import Product
-    from preorders.models import PreOrder
-    from sales.models import Sale
+    from django.db.models import ExpressionWrapper, DecimalField
+    from django.db.models.functions import Coalesce
+    from inventory.models import Product, Category
+    from preorders.models import PreOrder, PreOrderItem
+    from sales.models import Sale, CreditAccount, SaleItem
+    from procurement.models import ProcurementItem
+    from core.date_filter import resolve_period, parse_entity_filters
 
-    today_sales = Sale.objects.filter(store=store, created_at__date=today)
-    week_sales = Sale.objects.filter(store=store, created_at__date__gte=week_ago)
+    pf = resolve_period(request, today, default='this_week')
+    ef = parse_entity_filters(request)
+    start_date, end_date = pf['start_date'], pf['end_date']
+    active_staff_id = ef['active_staff_id']
+    active_category_id = ef['active_category_id']
+    active_product_id = ef['active_product_id']
+
+    # Period revenue/count — item-level when category/product filter active
+    if active_category_id or active_product_id:
+        item_q = {
+            'sale__store': store,
+            'sale__created_at__date__gte': start_date,
+            'sale__created_at__date__lte': end_date,
+            'sale__status': 'completed',
+            'product__isnull': False,
+        }
+        if active_staff_id:
+            item_q['sale__staff__pk'] = active_staff_id
+        if active_category_id:
+            item_q['product__category__pk'] = active_category_id
+        if active_product_id:
+            item_q['product__pk'] = active_product_id
+        fi = SaleItem.objects.filter(**item_q)
+        period_revenue = fi.aggregate(t=Sum('line_total'))['t'] or 0
+        period_count = fi.values('sale').distinct().count()
+    else:
+        sale_q = {
+            'store': store,
+            'created_at__date__gte': start_date,
+            'created_at__date__lte': end_date,
+            'status': 'completed',
+        }
+        if active_staff_id:
+            sale_q['staff__pk'] = active_staff_id
+        ps = Sale.objects.filter(**sale_q)
+        period_revenue = ps.aggregate(t=Sum('total_amount'))['t'] or 0
+        period_count = ps.count()
+
+    avg_sale = float(period_revenue) / max(period_count, 1)
+
+    # Credit overview (global, not period-filtered)
+    total_receivables = CreditAccount.objects.filter(
+        store=store, is_settled=False,
+    ).aggregate(
+        total=Sum(ExpressionWrapper(F('total_amount') - F('amount_paid'), output_field=DecimalField()))
+    )['total'] or 0
+
+    supplier_debt = ProcurementItem.objects.filter(
+        plan__store=store, is_fulfilled=True, is_paid=False,
+    ).aggregate(
+        total=Sum(ExpressionWrapper(
+            Coalesce(F('actual_qty'), F('planned_qty')) *
+            Coalesce(F('actual_unit_cost'), F('estimated_unit_cost')),
+            output_field=DecimalField()
+        ))
+    )['total'] or 0
+
+    _po_expr = ExpressionWrapper(F('quantity') * F('unit_price'), output_field=DecimalField())
+    preorder_obligation = PreOrderItem.objects.filter(
+        preorder__store=store,
+        preorder__status__in=['pending', 'confirmed', 'ready'],
+        unit_price__gt=0,
+    ).aggregate(total=Sum(_po_expr))['total'] or 0
+
+    net_credit = total_receivables - supplier_debt
+
+    # Filter dropdown data
+    filter_staff = StoreStaff.objects.filter(store=store, is_active=True).order_by('name')
+    filter_categories = Category.objects.filter(store=store).order_by('name')
+    filter_products = Product.objects.filter(store=store, is_active=True).order_by('name')
 
     context = {
         'store': store,
-        'today_revenue': today_sales.aggregate(t=Sum('total_amount'))['t'] or 0,
-        'today_count': today_sales.count(),
-        'week_revenue': week_sales.aggregate(t=Sum('total_amount'))['t'] or 0,
-        'week_count': week_sales.count(),
+        'period_revenue': period_revenue,
+        'period_count': period_count,
+        'avg_sale': avg_sale,
         'total_products': Product.objects.filter(store=store, is_active=True).count(),
         'low_stock': Product.objects.filter(
-            store=store,
-            is_active=True,
-            stock_qty__lte=F('reorder_level'),
+            store=store, is_active=True, stock_qty__lte=F('reorder_level'),
         ).count(),
         'out_of_stock': Product.objects.filter(store=store, is_active=True, stock_qty__lte=0).count(),
         'pending_preorders': PreOrder.objects.filter(store=store, status='pending').count(),
         'recent_sales': Sale.objects.filter(store=store).select_related('staff')[:5],
         'staff_count': StoreStaff.objects.filter(store=store, is_active=True).count(),
+        'total_receivables': total_receivables,
+        'supplier_debt': supplier_debt,
+        'preorder_obligation': preorder_obligation,
+        'net_credit': net_credit,
+        'filter_staff': filter_staff,
+        'filter_categories': filter_categories,
+        'filter_products': filter_products,
+        **pf,
+        **ef,
         **build_store_permissions(request.user, store),
     }
     return render(request, 'core/dashboard.html', context)

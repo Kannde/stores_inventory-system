@@ -1,0 +1,170 @@
+{% comment %}
+Shared filter bar — requires context:
+  period, period_label, f_date_from, f_date_to, period_choices,
+  active_staff_id, active_category_id, active_product_id,
+  filter_staff, filter_categories, filter_products
+{% endcomment %}
+<style>
+.rf-bar { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:10px 12px; margin-bottom:10px; }
+.rf-period-btn {
+  width:100%; display:flex; align-items:center; justify-content:space-between;
+  padding:10px 14px; background:var(--accent); color:#fff; border:none;
+  border-radius:var(--radius); font-size:14px; font-weight:600; cursor:pointer;
+  margin-bottom:8px; font-family:inherit;
+}
+.rf-period-btn:active { opacity:.85; }
+.rf-selects { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+.rf-selects select { font-size:12px; padding:6px 8px; width:100%; }
+.period-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+.period-btn { padding:10px; border:2px solid var(--border); background:var(--surface); border-radius:var(--radius); font-size:13px; font-family:inherit; cursor:pointer; text-align:center; }
+.period-btn.active { border-color:var(--accent); background:var(--accent-light); color:var(--accent-dark); font-weight:600; }
+</style>
+
+<div class="rf-bar">
+  <form method="get" id="filterForm">
+    <input type="hidden" name="period"    id="f_period"    value="{{ period }}">
+    <input type="hidden" name="date_from" id="f_date_from" value="{{ f_date_from }}">
+    <input type="hidden" name="date_to"   id="f_date_to"   value="{{ f_date_to }}">
+
+    <!-- Period button -->
+    <button type="button" class="rf-period-btn" onclick="openPeriodPicker()">
+      <span style="display:flex;align-items:center;gap:8px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="18" rx="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        {{ period_label }}
+      </span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </button>
+
+    <!-- Entity filters -->
+    <div class="rf-selects">
+      <select name="staff_id" class="form-input" onchange="document.getElementById('filterForm').submit()">
+        <option value="">All Staff</option>
+        {% for s in filter_staff %}
+        <option value="{{ s.pk }}" {% if active_staff_id == s.pk|stringformat:'s' %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+
+      <select name="category_id" class="form-input" onchange="document.getElementById('filterForm').submit()">
+        <option value="">All Categories</option>
+        {% for c in filter_categories %}
+        <option value="{{ c.pk }}" {% if active_category_id == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+
+      <select name="product_id" class="form-input" onchange="document.getElementById('filterForm').submit()">
+        <option value="">All Products</option>
+        {% for p in filter_products %}
+        <option value="{{ p.pk }}" {% if active_product_id == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Active filter tags (shown when non-default) -->
+    {% if active_staff_id or active_category_id or active_product_id %}
+    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">
+      {% if active_staff_id %}
+        {% for s in filter_staff %}{% if s.pk|stringformat:'s' == active_staff_id %}
+        <span style="font-size:11px;background:var(--accent-light);color:var(--accent-dark);border-radius:10px;padding:2px 8px">
+          👤 {{ s.name }}
+        </span>
+        {% endif %}{% endfor %}
+      {% endif %}
+      {% if active_category_id %}
+        {% for c in filter_categories %}{% if c.pk|stringformat:'s' == active_category_id %}
+        <span style="font-size:11px;background:var(--accent-light);color:var(--accent-dark);border-radius:10px;padding:2px 8px">
+          📂 {{ c.name }}
+        </span>
+        {% endif %}{% endfor %}
+      {% endif %}
+      {% if active_product_id %}
+        {% for p in filter_products %}{% if p.pk|stringformat:'s' == active_product_id %}
+        <span style="font-size:11px;background:var(--accent-light);color:var(--accent-dark);border-radius:10px;padding:2px 8px">
+          📦 {{ p.name }}
+        </span>
+        {% endif %}{% endfor %}
+      {% endif %}
+      <a href="?" style="font-size:11px;color:var(--text-3);padding:2px 8px;border-radius:10px;border:1px solid var(--border);text-decoration:none">
+        Clear ✕
+      </a>
+    </div>
+    {% endif %}
+
+  </form>
+</div>
+
+<!-- Period Picker Modal -->
+<div class="modal-overlay" id="periodModal">
+  <div class="modal-sheet" style="max-height:90vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <h2 style="font-size:16px;font-weight:600;margin-bottom:14px">Select Period</h2>
+
+    <div class="period-grid">
+      {% for key, label in period_choices %}
+      <button type="button"
+              class="period-btn {% if period == key %}active{% endif %}"
+              onclick="selectPeriod('{{ key }}')">{{ label }}</button>
+      {% endfor %}
+    </div>
+
+    <!-- Custom range -->
+    <div style="border-top:1px solid var(--border);padding-top:14px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
+        Custom Range
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div>
+          <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:3px">From</label>
+          <input type="date" id="customFrom" class="form-input" style="font-size:13px;padding:7px 8px" value="{{ f_date_from }}">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:3px">To</label>
+          <input type="date" id="customTo" class="form-input" style="font-size:13px;padding:7px 8px" value="{{ f_date_to }}">
+        </div>
+      </div>
+      <button type="button" class="btn btn-primary btn-block" onclick="applyCustom()">
+        Apply Custom Range
+      </button>
+    </div>
+
+    <button type="button" class="btn btn-outline btn-block" style="margin-top:8px"
+            onclick="document.getElementById('periodModal').classList.remove('open')">
+      Cancel
+    </button>
+  </div>
+</div>
+
+<script>
+(function () {
+  function openPeriodPicker() {
+    document.getElementById('periodModal').classList.add('open');
+  }
+  window.openPeriodPicker = openPeriodPicker;
+
+  window.selectPeriod = function (key) {
+    document.getElementById('f_period').value = key;
+    document.getElementById('periodModal').classList.remove('open');
+    document.getElementById('filterForm').submit();
+  };
+
+  window.applyCustom = function () {
+    const from = document.getElementById('customFrom').value;
+    const to   = document.getElementById('customTo').value;
+    if (!from || !to) return;
+    document.getElementById('f_period').value    = 'custom';
+    document.getElementById('f_date_from').value = from;
+    document.getElementById('f_date_to').value   = to;
+    document.getElementById('periodModal').classList.remove('open');
+    document.getElementById('filterForm').submit();
+  };
+
+  document.getElementById('periodModal').addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('open');
+  });
+}());
+</script>

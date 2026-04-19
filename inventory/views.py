@@ -241,9 +241,11 @@ def api_products(request, store_slug):
         products = products.filter(Q(name__icontains=q) | Q(sku__icontains=q))
     data = [{
         'id': str(p.id), 'name': p.name, 'sku': p.sku,
-        'unit_price': str(p.unit_price), 'stock_qty': p.stock_qty,
-        'unit_label': p.unit_label,
-    } for p in products[:50]]
+        'unit_price': str(p.unit_price), 'cost_price': str(p.cost_price),
+        'stock_qty': p.stock_qty, 'unit_label': p.unit_label,
+        'category_id': str(p.category_id) if p.category_id else '',
+        'category_name': p.category.name if p.category_id else '',
+    } for p in products.select_related('category')[:50]]
     return JsonResponse(data, safe=False)
 
 

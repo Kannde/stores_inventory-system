@@ -8,12 +8,7 @@
 {% endblock %}
 {% block content %}
 <div class="container">
-  <div class="tabs" style="overflow-x:auto;white-space:nowrap">
-    <a href="?period=7" class="tab {% if period == '7' %}active{% endif %}">7 Days</a>
-    <a href="?period=14" class="tab {% if period == '14' %}active{% endif %}">14 Days</a>
-    <a href="?period=30" class="tab {% if period == '30' %}active{% endif %}">30 Days</a>
-    <a href="?period=90" class="tab {% if period == '90' %}active{% endif %}">90 Days</a>
-  </div>
+  {% include 'includes/report_filters.html' %}
 
   <!-- P&L Summary -->
   <div class="card">
@@ -62,7 +57,7 @@
     </div>
     <div class="stat" style="grid-column:span 2">
       <div class="stat-label">Period</div>
-      <div class="stat-value" style="font-size:14px">{{ start_date|date:"d M" }} – Today</div>
+      <div class="stat-value" style="font-size:13px;font-weight:600">{{ period_label }}</div>
     </div>
   </div>
 

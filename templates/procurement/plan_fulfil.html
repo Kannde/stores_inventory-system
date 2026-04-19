@@ -1,100 +1,227 @@
 {% extends 'base.html' %}
-{% block title %}Fulfil Plan — {{ store.name }}{% endblock %}
+{% block title %}Confirm Purchase — {{ store.name }}{% endblock %}
 
 {% block topnav %}
 <div class="topnav">
   <a href="{% url 'procurement:plan_detail' store.slug plan.pk %}" class="back">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
   </a>
-  <h1 style="font-size:15px">Confirm Purchase</h1>
+  <h1 style="font-size:15px">What did you buy?</h1>
 </div>
 {% endblock %}
 
 {% block content %}
 <style>
-.fulfil-card { background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius); padding:14px; margin-bottom:10px; }
-.fulfil-card.new-product { border-color:var(--info); background:var(--info-light); }
-.checkbox-row { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-2); margin-top:8px; }
-.checkbox-row input[type=checkbox] { width:18px; height:18px; accent-color:var(--accent); }
+.item-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 10px;
+  transition: border-color .15s, opacity .2s;
+  position: relative;
+}
+.item-card.checked { border-color: var(--accent); }
+.item-card.unchecked { opacity: .45; }
+.check-toggle {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+  transition: background .15s, border-color .15s;
+}
+.check-toggle.on { background: var(--accent); border-color: var(--accent); }
+.item-details { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.item-card.checked .item-details { display: block; }
+.checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 8px; }
+.checkbox-row input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--accent); }
 </style>
 
-<div class="container" style="padding-bottom:120px">
-
-  <div class="card" style="background:var(--warning-light);border-color:var(--warning);margin-bottom:16px">
-    <div style="font-size:13px;color:var(--warning);font-weight:500">
-      Confirming will update stock levels and create products. This cannot be undone.
-    </div>
-  </div>
+<div class="container" style="padding-bottom:140px">
 
   {% if errors %}
-  <div class="card" style="background:var(--danger-light);border-color:var(--danger);margin-bottom:16px">
+  <div class="card" style="background:var(--danger-light);border-color:var(--danger);margin-bottom:12px">
     {% for e in errors %}<div style="font-size:13px;color:var(--danger)">{{ e }}</div>{% endfor %}
   </div>
   {% endif %}
 
-  <form method="post">
+  <div style="font-size:13px;color:var(--text-3);margin-bottom:14px;text-align:center">
+    Tick the items you actually purchased, then tap Confirm.
+  </div>
+
+  <form method="post" id="fulfilForm">
     {% csrf_token %}
 
     {% for item in items %}
-    <div class="fulfil-card {% if not item.product %}new-product{% endif %}">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div>
-          <div style="font-size:15px;font-weight:600">{{ item.display_name }}</div>
-          {% if not item.product %}
-          <span class="badge badge-info" style="font-size:10px">New Product</span>
-          {% else %}
-          <div style="font-size:12px;color:var(--text-3)">Current stock: {{ item.product.stock_qty }} {{ item.product.unit_label }}</div>
-          {% endif %}
+    <div class="item-card unchecked" id="card_{{ item.pk }}">
+      <!-- Header row: toggle + name -->
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="check-toggle" id="toggle_{{ item.pk }}" onclick="toggleItem('{{ item.pk }}')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" id="tick_{{ item.pk }}" style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
         </div>
-        <div style="font-size:13px;color:var(--text-3)">Planned: {{ item.planned_qty }}</div>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <div class="form-group" style="margin-bottom:0">
-          <label class="form-label">Qty Purchased</label>
-          <input type="number" name="actual_qty_{{ item.pk }}" class="form-input"
-            value="{{ item.planned_qty }}" min="0" inputmode="numeric" style="text-align:center;font-size:18px;font-weight:700">
-        </div>
-        <div class="form-group" style="margin-bottom:0">
-          <label class="form-label">Unit Cost ({{ store.currency_symbol }})</label>
-          <input type="number" name="actual_cost_{{ item.pk }}" class="form-input"
-            value="{{ item.estimated_unit_cost }}" step="0.01" inputmode="decimal">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:600">{{ item.display_name }}
+            {% if not item.product %}<span class="badge badge-info" style="font-size:9px;margin-left:4px">NEW</span>{% endif %}
+          </div>
+          <div style="font-size:12px;color:var(--text-3)">
+            Planned: {{ item.planned_qty }}{% if item.product %} · Stock now: {{ item.product.stock_qty }} {{ item.product.unit_label }}{% endif %}
+          </div>
         </div>
       </div>
 
-      {% if not item.product %}
-      <div class="form-group" style="margin-bottom:8px;background:rgba(255,255,255,.6);padding:10px;border-radius:var(--radius-sm)">
-        <label class="form-label">Selling Price ({{ store.currency_symbol }}) *</label>
-        <input type="number" name="selling_price_{{ item.pk }}" class="form-input"
-          step="0.01" inputmode="decimal" required placeholder="Required for new products"
-          style="border-color:var(--info)">
-      </div>
-      {% endif %}
+      <!-- Hidden checkbox driving form submission -->
+      <input type="checkbox" name="fulfilled_{{ item.pk }}" id="chk_{{ item.pk }}" style="display:none">
 
-      <div class="checkbox-row">
-        <input type="checkbox" name="is_paid_{{ item.pk }}" id="paid_{{ item.pk }}" checked>
-        <label for="paid_{{ item.pk }}">Paid</label>
-      </div>
-      <div class="checkbox-row">
-        <input type="checkbox" name="preorder_{{ item.pk }}" id="preorder_{{ item.pk }}" {% if item.available_for_preorder %}checked{% endif %}>
-        <label for="preorder_{{ item.pk }}">Available for preorder</label>
-      </div>
-      <div class="checkbox-row">
-        <input type="checkbox" name="fulfilled_{{ item.pk }}" id="recv_{{ item.pk }}" checked>
-        <label for="recv_{{ item.pk }}" style="font-weight:600">Received / Purchased</label>
+      <!-- Expanded detail — only visible when checked -->
+      <div class="item-details">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Qty Purchased</label>
+            <input type="number" name="actual_qty_{{ item.pk }}" class="form-input"
+              value="{{ item.planned_qty }}" min="1" inputmode="numeric"
+              style="text-align:center;font-size:20px;font-weight:700">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Unit Cost ({{ store.currency_symbol }})</label>
+            <input type="number" name="actual_cost_{{ item.pk }}" class="form-input"
+              value="{{ item.estimated_unit_cost }}" step="0.01" inputmode="decimal">
+          </div>
+        </div>
+
+        {% if not item.product %}
+        <div class="form-group" style="margin-bottom:8px;padding:10px;background:var(--info-light);border-radius:var(--radius-sm)">
+          <label class="form-label" style="color:var(--info)">Selling Price ({{ store.currency_symbol }}) *</label>
+          <input type="number" name="selling_price_{{ item.pk }}" class="form-input"
+            step="0.01" inputmode="decimal" placeholder="Required — what you'll sell it for"
+            style="border-color:var(--info)">
+        </div>
+        {% endif %}
+
+        <div class="checkbox-row">
+          <input type="checkbox" name="is_paid_{{ item.pk }}" id="paid_{{ item.pk }}" checked>
+          <label for="paid_{{ item.pk }}">Paid in full</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" name="preorder_{{ item.pk }}" id="pre_{{ item.pk }}" {% if item.available_for_preorder %}checked{% endif %}>
+          <label for="pre_{{ item.pk }}">Available for pre-order</label>
+        </div>
       </div>
     </div>
     {% endfor %}
 
-    <button type="submit" class="btn btn-primary btn-block" style="height:52px;font-size:16px;margin-top:6px">
-      Confirm & Add to Stock
-    </button>
-    <a href="{% url 'procurement:plan_detail' store.slug plan.pk %}" class="btn btn-outline btn-block" style="margin-top:8px">
-      Cancel
-    </a>
   </form>
 
+  <!-- Sticky confirm bar -->
+  <div style="position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:12px 16px calc(12px + env(safe-area-inset-bottom,0));z-index:95;box-shadow:0 -2px 10px rgba(0,0,0,.08)">
+    <div style="max-width:600px;margin:0 auto">
+      <div id="checkedSummary" style="font-size:13px;color:var(--text-3);text-align:center;margin-bottom:8px">No items selected yet</div>
+      <button type="button" id="confirmBtn" class="btn btn-primary btn-block" style="height:48px;font-size:16px" onclick="openConfirmModal()" disabled>
+        Confirm Purchase & Add to Stock
+      </button>
+    </div>
+  </div>
 </div>
+
+<!-- Confirmation modal -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <h2 style="font-size:18px;font-weight:600;margin-bottom:4px">Confirm Purchase</h2>
+    <p style="font-size:13px;color:var(--text-3);margin-bottom:14px">
+      The following items will be added to stock. This cannot be undone.
+    </p>
+    <div id="confirmList" style="margin-bottom:16px"></div>
+    <div style="background:var(--warning-light);border-radius:var(--radius-sm);padding:10px;margin-bottom:16px;font-size:13px;color:var(--warning)">
+      ⚠ Only ticked items will be processed. Unticked items remain as planned.
+    </div>
+    <div style="display:flex;gap:8px">
+      <button type="button" class="btn btn-outline" style="flex:1" onclick="document.getElementById('confirmModal').classList.remove('open')">Go Back</button>
+      <button type="button" class="btn btn-primary" style="flex:2" onclick="submitForm()">Yes, Add to Stock</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CURRENCY = '{{ store.currency_symbol }}';
+const checkedItems = {};
+
+{% for item in items %}
+checkedItems['{{ item.pk }}'] = false;
+{% endfor %}
+
+function toggleItem(pk) {
+  checkedItems[pk] = !checkedItems[pk];
+  const card = document.getElementById('card_' + pk);
+  const toggle = document.getElementById('toggle_' + pk);
+  const tick = document.getElementById('tick_' + pk);
+  const chk = document.getElementById('chk_' + pk);
+
+  if (checkedItems[pk]) {
+    card.classList.replace('unchecked', 'checked');
+    toggle.classList.add('on');
+    tick.style.display = 'block';
+    chk.checked = true;
+  } else {
+    card.classList.replace('checked', 'unchecked');
+    toggle.classList.remove('on');
+    tick.style.display = 'none';
+    chk.checked = false;
+  }
+  updateSummary();
+}
+
+function updateSummary() {
+  const count = Object.values(checkedItems).filter(Boolean).length;
+  const btn = document.getElementById('confirmBtn');
+  const summary = document.getElementById('checkedSummary');
+  if (count === 0) {
+    summary.textContent = 'No items selected yet';
+    btn.disabled = true;
+  } else {
+    summary.textContent = count + ' item' + (count > 1 ? 's' : '') + ' selected';
+    btn.disabled = false;
+  }
+}
+
+function openConfirmModal() {
+  const items = [];
+  {% for item in items %}
+  if (checkedItems['{{ item.pk }}']) {
+    const qty = document.querySelector('input[name="actual_qty_{{ item.pk }}"]')?.value || '{{ item.planned_qty }}';
+    const cost = document.querySelector('input[name="actual_cost_{{ item.pk }}"]')?.value || '{{ item.estimated_unit_cost }}';
+    items.push({
+      name: '{{ item.display_name|escapejs }}',
+      qty: qty,
+      cost: cost,
+      isNew: {{ item.product|yesno:'false,true' }},
+    });
+  }
+  {% endfor %}
+
+  const list = document.getElementById('confirmList');
+  list.innerHTML = items.map(it => `
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px">
+      <span>${it.name}${it.isNew ? ' <span class="badge badge-info" style="font-size:9px">NEW</span>' : ''}</span>
+      <span style="font-weight:600">${it.qty} × ${CURRENCY}${parseFloat(it.cost).toFixed(2)}</span>
+    </div>
+  `).join('');
+
+  document.getElementById('confirmModal').classList.add('open');
+}
+
+function submitForm() {
+  document.getElementById('confirmModal').classList.remove('open');
+  document.getElementById('fulfilForm').submit();
+}
+
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+</script>
 {% endblock %}
 
 {% block bottomnav %}{% with nav='stock' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

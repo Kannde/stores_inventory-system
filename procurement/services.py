@@ -7,6 +7,7 @@ from inventory.sku import generate_sku
 @transaction.atomic
 def fulfil_plan(plan):
     created = restocked = skipped = 0
+    needs_images = []  # list of (product, is_new)
 
     for item in plan.items.select_related('product', 'category').all():
         if not item.is_fulfilled:
@@ -14,29 +15,12 @@ def fulfil_plan(plan):
             continue
 
         qty = item.actual_qty or item.planned_qty
-        cost = item.actual_unit_cost or item.estimated_unit_cost
 
         if item.product:
-            # Restock existing product
+            # Restock existing product — only increment stock qty
             prod = item.product
             prod.stock_qty += qty
-            update_fields = ['stock_qty']
-
-            if cost:
-                prod.cost_price = cost
-                update_fields.append('cost_price')
-            if item.supplier_name:
-                supplier_obj, _ = Supplier.objects.get_or_create(
-                    store=plan.store, name=item.supplier_name,
-                    defaults={'ownership': 'external'},
-                )
-                prod.supplier = supplier_obj
-                update_fields.append('supplier')
-            prod.is_paid = item.is_paid
-            update_fields.append('is_paid')
-            prod.available_for_preorder = item.available_for_preorder
-            update_fields.append('available_for_preorder')
-            prod.save(update_fields=update_fields)
+            prod.save(update_fields=['stock_qty'])
 
             StockMovement.objects.create(
                 product=prod, movement_type='in',
@@ -46,8 +30,12 @@ def fulfil_plan(plan):
             )
             restocked += 1
 
+            if not prod.images.exists():
+                needs_images.append({'id': str(prod.id), 'name': prod.name, 'is_new': False})
+
         else:
-            # Create new product
+            # Create brand-new product
+            cost = item.actual_unit_cost or item.estimated_unit_cost
             supplier_obj = None
             if item.supplier_name:
                 supplier_obj, _ = Supplier.objects.get_or_create(
@@ -81,9 +69,10 @@ def fulfil_plan(plan):
             item.product = prod
             item.save(update_fields=['product'])
             created += 1
+            needs_images.append({'id': str(prod.id), 'name': prod.name, 'is_new': True})
 
     plan.status = 'fulfilled'
     plan.fulfilled_at = timezone.now()
     plan.save(update_fields=['status', 'fulfilled_at'])
 
-    return {'created': created, 'restocked': restocked, 'skipped': skipped}
+    return {'created': created, 'restocked': restocked, 'skipped': skipped, 'needs_images': needs_images}
