@@ -18,5 +18,6 @@ urlpatterns = [
     path('s/<slug:store_slug>/procurement/', include('procurement.urls')),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Serve uploaded media files in all environments.
+# WhiteNoise only handles STATIC_ROOT; user uploads need an explicit handler.
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
