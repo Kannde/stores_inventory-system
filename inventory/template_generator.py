@@ -7,6 +7,45 @@ from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.utils import quote_sheetname
 
 
+PLATFORM_CATEGORIES = [
+    'Automotive',
+    'Baby & Infant',
+    'Beauty & Personal Care',
+    'Beverages',
+    'Beverages - Alcohol',
+    'Books & Media',
+    'Bread & Bakery',
+    'Breakfast & Cereal',
+    'Canned & Packaged Goods',
+    'Cleaning Supplies',
+    'Clothing & Apparel',
+    'Condiments & Sauces',
+    'Confectionery & Sweets',
+    'Dairy & Eggs',
+    'Electronics & Accessories',
+    'Fabric & Sewing',
+    'Fertilizers & Agrochemicals',
+    'Fresh Produce',
+    'Frozen Foods',
+    'Gift & Seasonal',
+    'Grains & Rice',
+    'Hardware & Tools',
+    'Health & Wellness',
+    'Household Items',
+    'Laundry & Detergents',
+    'Meat & Poultry',
+    'Office & Stationery',
+    'Pet Supplies',
+    'Phones & Accessories',
+    'Seafood',
+    'Snacks & Chips',
+    'Spices & Seasonings',
+    'Sports & Outdoor',
+    'Toys & Games',
+    'Veterinary & Animal Feed',
+]
+
+
 HEADERS = [
     ('Product Name *', 30),
     ('Category', 20),
@@ -117,22 +156,11 @@ def generate_product_template(store):
         row += 1
 
     # ── Categories reference sheet ───────────────────────────────────────
-    # Include this store's categories first, then any unique names from other stores.
-    from inventory.models import Category as _Category
+    # Merge: store's own categories + platform standard list, deduped case-insensitively, sorted.
     store_cats = list(store.categories.order_by('name').values_list('name', flat=True))
     seen = {n.lower() for n in store_cats}
-    other_cats = (
-        _Category.objects
-        .exclude(store=store)
-        .order_by('name')
-        .values_list('name', flat=True)
-    )
-    extra = []
-    for name in other_cats:
-        if name.lower() not in seen:
-            seen.add(name.lower())
-            extra.append(name)
-    all_cat_names = list(store_cats) + sorted(extra)
+    extra = [n for n in PLATFORM_CATEGORIES if n.lower() not in seen]
+    all_cat_names = sorted(store_cats + extra, key=str.casefold)
 
     ws2 = wb.create_sheet('Categories')
     hdr = ws2.cell(row=1, column=1, value='Category Name')
