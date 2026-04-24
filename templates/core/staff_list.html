@@ -6,6 +6,7 @@
   <h1>Staff</h1>
   <div class="topnav-actions">
     <a href="{% url 'core:staff_add' store.slug %}" class="action">+ Add</a>
+    <a href="{% url 'core:change_password' store.slug %}" class="action">My Password</a>
     <a href="{% url 'core:logout' %}" class="action">Logout</a>
   </div>
 </div>
@@ -25,11 +26,14 @@
         {% if m.phone %} · {{ m.phone }}{% endif %}
       </div>
     </div>
-    <div style="display:flex;gap:8px;align-items:center">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
       <span class="badge {% if m.is_active %}badge-success{% else %}badge-danger{% endif %}">
         {{ m.is_active|yesno:"Active,Inactive" }}
       </span>
       <a href="{% url 'core:staff_edit' store.slug m.pk %}" class="btn btn-outline btn-sm">Edit</a>
+      {% if can_edit_store and m.user %}
+      <a href="{% url 'core:staff_reset_password' store.slug m.pk %}" class="btn btn-outline btn-sm">Reset PW</a>
+      {% endif %}
       <a href="{% url 'core:staff_toggle' store.slug m.pk %}" class="btn btn-outline btn-sm">Toggle</a>
     </div>
   </div>

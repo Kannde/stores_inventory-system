@@ -21,4 +21,6 @@ urlpatterns = [
     path('s/<slug:store_slug>/staff/add/', views.staff_add, name='staff_add'),
     path('s/<slug:store_slug>/staff/<uuid:pk>/edit/', views.staff_edit, name='staff_edit'),
     path('s/<slug:store_slug>/staff/<uuid:pk>/toggle/', views.staff_toggle, name='staff_toggle'),
+    path('s/<slug:store_slug>/staff/<uuid:pk>/reset-password/', views.staff_reset_password, name='staff_reset_password'),
+    path('s/<slug:store_slug>/change-password/', views.change_password, name='change_password'),
 ]

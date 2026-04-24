@@ -2,7 +2,7 @@
 from django.contrib import messages
 from django.views.decorators.cache import never_cache
 from django.contrib.admin.models import LogEntry
-from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.contrib.auth import authenticate, get_user_model, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db.models import Count, F, Q, Sum
@@ -422,6 +422,68 @@ def store_settings(request, store_slug):
         'store': store,
         'form': form,
         'store_settings': settings_obj,
+        **build_store_permissions(request.user, store),
+    })
+
+
+@login_required
+def change_password(request, store_slug):
+    store = get_store(store_slug, request.user)
+
+    error = None
+    if request.method == 'POST':
+        old = request.POST.get('old_password', '')
+        new1 = request.POST.get('new_password1', '')
+        new2 = request.POST.get('new_password2', '')
+        if not request.user.check_password(old):
+            error = 'Current password is incorrect.'
+        elif new1 != new2:
+            error = 'New passwords do not match.'
+        elif len(new1) < 6:
+            error = 'New password must be at least 6 characters.'
+        else:
+            request.user.set_password(new1)
+            request.user.save(update_fields=['password'])
+            update_session_auth_hash(request, request.user)
+            messages.success(request, 'Password changed successfully.')
+            return redirect('core:store_dashboard', store_slug=store.slug)
+
+    return render(request, 'core/change_password.html', {
+        'store': store,
+        'error': error,
+        **build_store_permissions(request.user, store),
+    })
+
+
+@login_required
+def staff_reset_password(request, store_slug, pk):
+    store = get_store(store_slug, request.user)
+    if not is_store_owner(request.user, store):
+        raise PermissionDenied
+
+    member = get_object_or_404(StoreStaff, pk=pk, store=store)
+    if not member.user:
+        messages.error(request, 'This staff member has no login account set up.')
+        return redirect('core:staff_list', store_slug=store.slug)
+
+    error = None
+    if request.method == 'POST':
+        new1 = request.POST.get('new_password1', '')
+        new2 = request.POST.get('new_password2', '')
+        if new1 != new2:
+            error = 'Passwords do not match.'
+        elif len(new1) < 6:
+            error = 'Password must be at least 6 characters.'
+        else:
+            member.user.set_password(new1)
+            member.user.save(update_fields=['password'])
+            messages.success(request, f"Password for {member.name} has been reset.")
+            return redirect('core:staff_list', store_slug=store.slug)
+
+    return render(request, 'core/staff_reset_password.html', {
+        'store': store,
+        'member': member,
+        'error': error,
         **build_store_permissions(request.user, store),
     })
 

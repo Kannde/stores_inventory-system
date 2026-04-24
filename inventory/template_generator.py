@@ -3,6 +3,8 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.comments import Comment
 from openpyxl.utils import get_column_letter
+from openpyxl.workbook.defined_name import DefinedName
+from openpyxl.utils import quote_sheetname
 
 
 HEADERS = [
@@ -115,15 +117,42 @@ def generate_product_template(store):
         row += 1
 
     # ── Categories reference sheet ───────────────────────────────────────
-    ws2 = wb.create_sheet('Categories')
-    ws2.cell(row=1, column=1, value='Category Name').font = header_font
-    ws2.column_dimensions['A'].width = 28
+    # Include this store's categories first, then any unique names from other stores.
+    from inventory.models import Category as _Category
+    store_cats = list(store.categories.order_by('name').values_list('name', flat=True))
+    seen = {n.lower() for n in store_cats}
+    other_cats = (
+        _Category.objects
+        .exclude(store=store)
+        .order_by('name')
+        .values_list('name', flat=True)
+    )
+    extra = []
+    for name in other_cats:
+        if name.lower() not in seen:
+            seen.add(name.lower())
+            extra.append(name)
+    all_cat_names = list(store_cats) + sorted(extra)
 
-    categories = store.categories.all().order_by('name')
-    for i, cat in enumerate(categories, start=2):
-        ws2.cell(row=i, column=1, value=cat.name)
+    ws2 = wb.create_sheet('Categories')
+    hdr = ws2.cell(row=1, column=1, value='Category Name')
+    hdr.font = header_font
+    hdr.fill = header_fill
+    ws2.column_dimensions['A'].width = 28
+    for i, name in enumerate(all_cat_names, start=2):
+        ws2.cell(row=i, column=1, value=name)
 
     ws2.sheet_state = 'visible'
+
+    # Named range so the Products sheet can reference it as a dropdown
+    cat_count = max(len(all_cat_names), 1)
+    cat_range = f"{quote_sheetname('Categories')}!$A$2:$A${cat_count + 1}"
+    wb.defined_names['CategoryList'] = DefinedName('CategoryList', attr_text=cat_range)
+
+    # Dropdown validation on Category column (B) in Products sheet
+    cat_dv = DataValidation(type='list', formula1='CategoryList', allow_blank=True, showErrorMessage=False)
+    cat_dv.sqref = 'B2:B1048576'
+    ws.add_data_validation(cat_dv)
 
     # ── Variants sheet ───────────────────────────────────────────────────
     ws3 = wb.create_sheet('Variants')

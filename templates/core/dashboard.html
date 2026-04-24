@@ -9,6 +9,7 @@
   <div class="topnav-actions">
     {% if can_edit_store %}<a href="{% url 'core:store_settings' store.slug %}" class="action">Store</a>{% endif %}
     {% if can_manage_staff %}<a href="{% url 'core:staff_list' store.slug %}" class="action">Staff</a>{% endif %}
+    {% if not request.user.is_superuser %}<a href="{% url 'core:change_password' store.slug %}" class="action">Password</a>{% endif %}
     <a href="{% url 'core:logout' %}" class="action">Logout</a>
   </div>
 </div>
