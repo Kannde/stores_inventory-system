@@ -61,6 +61,7 @@ class StoreSettings(models.Model):
     preorder_welcome_message = models.TextField(blank=True)
     preorder_whatsapp_number = models.CharField(max_length=20, blank=True, help_text='WhatsApp number with country code, e.g. 233244000000')
     preorder_all_products = models.BooleanField(default=True, help_text='Show all active products in preorder catalog')
+    manager_can_manage_shipments = models.BooleanField(default=False, help_text='Allow store managers to access shipment management')
 
     def __str__(self):
         return f"Settings for {self.store.name}"
@@ -92,7 +93,13 @@ class StoreStaff(models.Model):
     class Meta:
         ordering = ['name']
         verbose_name_plural = 'Store staff'
-        unique_together = ['store', 'pin']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['store', 'pin'],
+                condition=models.Q(pin__gt=''),
+                name='unique_store_pin_when_set',
+            )
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.get_role_display()}) - {self.store.name}"
