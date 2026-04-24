@@ -8,6 +8,9 @@ class Expense(models.Model):
     CATEGORY_CHOICES = [
         ('salary',    'Staff Salary'),
         ('transport', 'Transportation'),
+        ('freight',   'Freight'),
+        ('customs',   'Customs'),
+        ('clearing',  'Clearing'),
         ('marketing', 'Marketing'),
         ('breakage',  'Breakages'),
         ('expiry',    'Expired Products'),
@@ -25,6 +28,7 @@ class Expense(models.Model):
     recorded_by = models.ForeignKey(StoreStaff, on_delete=models.SET_NULL, null=True, blank=True, related_name='expenses_recorded')
     # For breakage / expiry: link the product so cost auto-fills
     product     = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, blank=True, related_name='expense_entries')
+    shipment    = models.ForeignKey('shipments.Shipment', on_delete=models.SET_NULL, null=True, blank=True, related_name='expenses')
     product_qty = models.PositiveIntegerField(default=1)
     created_at  = models.DateTimeField(auto_now_add=True)
 

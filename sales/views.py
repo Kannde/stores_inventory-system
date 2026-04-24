@@ -5,6 +5,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.db import transaction
+from core.access import require_store_permission
 from core.views import get_store
 from core.models import StoreSettings, StoreStaff
 from inventory.models import Product, Package, StockMovement
@@ -14,6 +15,7 @@ from .models import CreditAccount, CreditPayment, Sale, SaleItem
 @login_required
 def sale_list(request, store_slug):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'sell')
     sales = Sale.objects.filter(store=store).select_related('staff')[:50]
     return render(request, 'sales/sale_list.html', {'store': store, 'sales': sales})
 
@@ -21,6 +23,7 @@ def sale_list(request, store_slug):
 @login_required
 def new_sale(request, store_slug):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'sell')
     staff = StoreStaff.objects.filter(store=store, is_active=True, role__in=['sales', 'manager'])
 
     # Auto-detect current user's staff profile
@@ -67,6 +70,7 @@ def new_sale(request, store_slug):
 @login_required
 def sale_detail(request, store_slug, pk):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'sell')
     sale = get_object_or_404(Sale, pk=pk, store=store)
     return render(request, 'sales/sale_detail.html', {'store': store, 'sale': sale})
 
@@ -74,6 +78,7 @@ def sale_detail(request, store_slug, pk):
 @login_required
 def sale_receipt(request, store_slug, pk):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'sell')
     sale = get_object_or_404(Sale, pk=pk, store=store)
     return render(request, 'sales/receipt.html', {'store': store, 'sale': sale})
 
@@ -83,6 +88,7 @@ def sale_receipt(request, store_slug, pk):
 @require_POST
 def api_checkout(request, store_slug):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'sell')
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
@@ -188,6 +194,7 @@ def api_checkout(request, store_slug):
 @login_required
 def credit_list(request, store_slug):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_credit')
     credits = CreditAccount.objects.filter(store=store).select_related('sale').order_by('-created_at')
     unsettled = credits.filter(is_settled=False)
     total_outstanding = sum(c.balance_due for c in unsettled)
@@ -200,6 +207,7 @@ def credit_list(request, store_slug):
 @login_required
 def credit_payment(request, store_slug, pk):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_credit')
     credit = get_object_or_404(CreditAccount, pk=pk, store=store)
     if request.method == 'POST':
         amount = request.POST.get('amount')

@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block title %}Shipments - {{ store.name }}{% endblock %}
+
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'core:store_dashboard' store.slug %}" class="back">&larr;</a>
+  <h1>Shipments</h1>
+  <div class="topnav-actions">
+    <a href="{% url 'shipments:shipment_add' store.slug %}" class="action">+ New</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">In Transit</div>
+      <div class="stat-value">{{ in_transit_count }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">At Port</div>
+      <div class="stat-value">{{ at_port_count }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Pending Receiving</div>
+      <div class="stat-value warning">{{ pending_packages_count }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Missing Items</div>
+      <div class="stat-value danger">{{ missing_packages_count }}</div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat" style="grid-column:span 2">
+      <div class="stat-label">Shipment Expenses This Month</div>
+      <div class="stat-value danger">{{ store.currency_symbol }}{{ shipment_expenses|floatformat:2 }}</div>
+    </div>
+  </div>
+
+  <form method="get" class="search-bar" style="margin-bottom:12px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="search" name="q" placeholder="Search tracking, company, package code, supplier..." value="{{ q }}">
+    {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+  </form>
+
+  <div class="tabs">
+    <a href="?{% if q %}q={{ q|urlencode }}{% endif %}" class="tab {% if not status_filter %}active{% endif %}">All</a>
+    {% for value, label in status_choices %}
+    <a href="?status={{ value }}{% if q %}&q={{ q|urlencode }}{% endif %}" class="tab {% if status_filter == value %}active{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+
+  {% for shipment in shipments %}
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+      <div style="min-width:0">
+        <div style="font-size:15px;font-weight:700">{{ shipment.tracking_number }}</div>
+        <div style="font-size:12px;color:var(--text-3);margin-top:3px">{{ shipment.shipping_company }} | {{ shipment.get_method_display }}</div>
+        <div style="font-size:12px;color:var(--text-3);margin-top:4px">
+          {{ shipment.origin }} to {{ shipment.destination }}
+          {% if shipment.estimated_arrival %} | ETA {{ shipment.estimated_arrival|date:"d M Y" }}{% endif %}
+        </div>
+      </div>
+      <span class="badge {% if shipment.status == 'DELIVERED' %}badge-success{% elif shipment.status == 'PORT' or shipment.status == 'CUSTOMS' %}badge-warning{% else %}badge-info{% endif %}">
+        {{ shipment.get_status_display }}
+      </span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px">
+      <div style="padding:8px;border-radius:10px;background:var(--surface-2);text-align:center">
+        <div style="font-size:11px;color:var(--text-3)">Packages</div>
+        <div style="font-size:16px;font-weight:700">{{ shipment.packages.count }}</div>
+      </div>
+      <div style="padding:8px;border-radius:10px;background:var(--surface-2);text-align:center">
+        <div style="font-size:11px;color:var(--text-3)">Pending</div>
+        <div style="font-size:16px;font-weight:700;color:var(--warning)">{{ shipment.packages_pending_receiving }}</div>
+      </div>
+      <div style="padding:8px;border-radius:10px;background:var(--surface-2);text-align:center">
+        <div style="font-size:11px;color:var(--text-3)">Missing</div>
+        <div style="font-size:16px;font-weight:700;color:var(--danger)">{{ shipment.packages_with_missing_items }}</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <a href="{% url 'shipments:shipment_detail' store.slug shipment.pk %}" class="btn btn-outline btn-sm" style="flex:1;min-width:120px">Open</a>
+      <a href="{% url 'shipments:shipment_edit' store.slug shipment.pk %}" class="btn btn-outline btn-sm" style="flex:1;min-width:120px">Edit</a>
+      {% if shipment.next_pending_package %}
+      <a href="{% url 'shipments:package_receive' store.slug shipment.next_pending_package.pk %}" class="btn btn-primary btn-sm" style="flex:1;min-width:120px">Receive {{ shipment.next_pending_package.package_code }}</a>
+      {% endif %}
+    </div>
+  </div>
+  {% empty %}
+  <div class="empty">
+    <p>No shipments yet</p>
+    <a href="{% url 'shipments:shipment_add' store.slug %}" class="btn btn-primary" style="margin-top:12px">Create First Shipment</a>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block bottomnav %}{% with nav='dashboard' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

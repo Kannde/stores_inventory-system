@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+{% block title %}Shipment {{ shipment.tracking_number }} - {{ store.name }}{% endblock %}
+
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'shipments:shipment_list' store.slug %}" class="back">&larr;</a>
+  <h1 style="font-size:15px">{{ shipment.tracking_number }}</h1>
+  <a href="{% url 'shipments:shipment_edit' store.slug shipment.pk %}" class="action">Edit</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-bottom:120px">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div>
+        <div style="font-size:18px;font-weight:700">{{ shipment.tracking_number }}</div>
+        <div style="font-size:13px;color:var(--text-3);margin-top:4px">{{ shipment.shipping_company }} | {{ shipment.get_method_display }}</div>
+        <div style="font-size:13px;color:var(--text-3);margin-top:4px">{{ shipment.origin }} to {{ shipment.destination }}</div>
+      </div>
+      <span class="badge {% if shipment.status == 'DELIVERED' %}badge-success{% elif shipment.status == 'PORT' or shipment.status == 'CUSTOMS' %}badge-warning{% else %}badge-info{% endif %}">{{ shipment.get_status_display }}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+      <div style="font-size:12px;color:var(--text-3)">Departure: {{ shipment.departure_date|date:"d M Y"|default:"-" }}</div>
+      <div style="font-size:12px;color:var(--text-3)">ETA: {{ shipment.estimated_arrival|date:"d M Y"|default:"-" }}</div>
+      <div style="font-size:12px;color:var(--text-3)">Actual Arrival: {{ shipment.actual_arrival|date:"d M Y"|default:"-" }}</div>
+      {% if shipment.document %}<div style="font-size:12px;color:var(--text-3)"><a href="{{ shipment.document.url }}" target="_blank">Open document</a></div>{% endif %}
+    </div>
+    {% if shipment.notes %}<div style="font-size:13px;color:var(--text-2);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">{{ shipment.notes }}</div>{% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:12px">Update Status</div>
+    <form method="post" action="{% url 'shipments:shipment_status' store.slug shipment.pk %}">
+      {% csrf_token %}
+      <div class="form-group">
+        <select name="status" class="form-select">
+          {% for value, label in status_choices %}
+          <option value="{{ value }}" {% if shipment.status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status Note</label>
+        <textarea name="note" class="form-textarea" rows="2" placeholder="Optional note for the timeline"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Save Status</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Packages</span>
+      <span style="font-size:12px;color:var(--text-3)">{{ shipment.packages.count }} total</span>
+    </div>
+    {% for package in shipment.packages.all %}
+    <div style="padding:12px 0;border-bottom:1px solid var(--border){% if forloop.last %};border-bottom:none{% endif %}">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+        <div>
+          <div style="font-size:14px;font-weight:700">{{ package.package_code }}</div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:3px">
+            {% if package.supplier %}{{ package.supplier.name }} | {% endif %}
+            {{ package.items.count }} item line{{ package.items.count|pluralize }}
+          </div>
+          {% if package.description %}<div style="font-size:12px;color:var(--text-2);margin-top:4px">{{ package.description }}</div>{% endif %}
+          {% if package.supplier and package.supplier.phone %}
+          <div style="font-size:12px;margin-top:6px"><a href="https://wa.me/{{ package.supplier.phone }}" target="_blank" style="color:#25d366">Contact supplier on WhatsApp</a></div>
+          {% endif %}
+        </div>
+        <span class="badge {% if package.is_received %}badge-success{% elif package.missing_items_count %}badge-danger{% else %}badge-warning{% endif %}">
+          {% if package.is_received %}Received{% elif package.missing_items_count %}Missing {{ package.missing_quantity_total }}{% else %}Pending{% endif %}
+        </span>
+      </div>
+      <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+        {% for item in package.items.all %}
+        <div style="display:flex;justify-content:space-between;gap:8px;font-size:12px">
+          <span>{{ item.product.name }}{% if item.variant_color or item.variant_size %} <span style="color:var(--text-3)">{% if item.variant_color %}{{ item.variant_color }}{% endif %}{% if item.variant_color and item.variant_size %} / {% endif %}{% if item.variant_size %}{{ item.variant_size }}{% endif %}</span>{% endif %}</span>
+          <span style="color:{% if item.missing_quantity %}var(--danger){% else %}var(--accent){% endif %}">
+            {{ item.received_quantity }}/{{ item.expected_quantity }}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <a href="{% url 'shipments:package_receive' store.slug package.pk %}" class="btn {% if package.is_received %}btn-outline{% else %}btn-primary{% endif %} btn-sm" style="flex:1">
+          {% if package.is_received %}View Receiving{% else %}Receive Package{% endif %}
+        </a>
+      </div>
+      <div style="font-size:12px;color:var(--text-3);margin-top:8px">Allocated shipment cost share: {{ store.currency_symbol }}{{ package.allocated_cost|floatformat:2 }}</div>
+    </div>
+    {% empty %}
+    <div class="empty"><p>No packages attached yet</p></div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Shipment Costs</span>
+      <span style="font-size:13px;color:var(--danger);font-weight:700">{{ store.currency_symbol }}{{ shipment_expense_total|floatformat:2 }}</span>
+    </div>
+    <form method="post" action="{% url 'expenses:expense_add' store.slug %}" style="margin-top:10px">
+      {% csrf_token %}
+      <input type="hidden" name="shipment_id" value="{{ shipment.id }}">
+      <input type="hidden" name="next" value="{{ request.path }}">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label class="form-label">Cost Type</label>
+          <select name="category" class="form-select">
+            {% for value, label in shipping_expense_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Amount</label>
+          <input type="number" name="amount" class="form-input" step="0.01" required>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label class="form-label">Date</label>
+          <input type="date" name="date" class="form-input" value="{% now 'Y-m-d' %}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <input type="text" name="description" class="form-input" placeholder="Optional note">
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Add Shipment Cost</button>
+    </form>
+
+    {% if expenses %}
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+      {% for expense in expenses %}
+      <div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border){% if forloop.last %};border-bottom:none{% endif %}">
+        <div>
+          <div style="font-size:13px;font-weight:600">{{ expense.get_category_display }}</div>
+          <div style="font-size:12px;color:var(--text-3)">{{ expense.date|date:"d M Y" }}{% if expense.description %} | {{ expense.description }}{% endif %}</div>
+        </div>
+        <div style="font-size:13px;font-weight:700;color:var(--danger)">{{ store.currency_symbol }}{{ expense.amount|floatformat:2 }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:10px">Status History</div>
+    {% for row in shipment.history.all %}
+    <div style="padding:8px 0;border-bottom:1px solid var(--border){% if forloop.last %};border-bottom:none{% endif %}">
+      <div style="font-size:13px;font-weight:600">{{ row.status }}</div>
+      <div style="font-size:12px;color:var(--text-3)">{{ row.created_at|date:"d M Y, H:i" }}</div>
+      {% if row.note %}<div style="font-size:12px;color:var(--text-2);margin-top:3px">{{ row.note }}</div>{% endif %}
+    </div>
+    {% empty %}
+    <div class="empty"><p>No history yet</p></div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block bottomnav %}{% with nav='dashboard' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

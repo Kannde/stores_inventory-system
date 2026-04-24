@@ -2,11 +2,18 @@
 {% block title %}Pre-order Submitted{% endblock %}
 {% block content %}
 <div class="container" style="text-align:center;padding-top:60px">
-  <div style="font-size:56px;margin-bottom:12px">✓</div>
-  <h2 style="font-size:22px;font-weight:600;color:var(--accent)">Pre-order Submitted</h2>
+  <div style="font-size:56px;margin-bottom:12px">Done</div>
+  <h2 style="font-size:22px;font-weight:700;color:var(--accent)">Pre-order Submitted</h2>
   <p style="color:var(--text-2);margin-top:8px;font-size:15px">
     {{ store.name }} will review your order and contact you soon.
   </p>
+  {% if preorder %}
+  <div class="card" style="margin-top:20px;text-align:left">
+    <div class="card-title" style="margin-bottom:8px">Order Reference</div>
+    <div style="font-size:14px;font-weight:700;color:var(--accent)">{{ preorder.id }}</div>
+    <div style="font-size:12px;color:var(--text-3);margin-top:8px">When the order is ready, the store can send a pickup code to the customer.</div>
+  </div>
+  {% endif %}
   <a href="{% url 'preorders:preorder_form' store.slug %}" class="btn btn-outline" style="margin-top:24px">Submit Another</a>
 </div>
 {% endblock %}

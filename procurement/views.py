@@ -3,6 +3,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 
+from core.access import require_store_permission
 from core.views import get_store
 from core.models import StoreStaff
 from inventory.models import Product, Category
@@ -12,6 +13,7 @@ from .models import ProcurementPlan, ProcurementItem
 @login_required
 def plan_list(request, store_slug):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_procurement')
     status_filter = request.GET.get('status', '')
     plans = ProcurementPlan.objects.filter(store=store)
     if status_filter:
@@ -27,6 +29,7 @@ def plan_list(request, store_slug):
 @login_required
 def plan_create(request, store_slug):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_procurement')
     categories = Category.objects.filter(store=store)
     staff = StoreStaff.objects.filter(store=store, is_active=True)
 
@@ -61,6 +64,7 @@ def plan_create(request, store_slug):
 @login_required
 def plan_edit(request, store_slug, pk):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_procurement')
     plan = get_object_or_404(ProcurementPlan, pk=pk, store=store)
     if plan.status != 'draft':
         return redirect('procurement:plan_detail', store_slug=store.slug, pk=pk)
@@ -145,6 +149,7 @@ def _save_items(request, plan, store):
 @login_required
 def plan_detail(request, store_slug, pk):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_procurement')
     plan = get_object_or_404(ProcurementPlan, pk=pk, store=store)
     items = plan.items.select_related('product', 'category').all()
     fulfil_result = request.session.pop('fulfil_result', None)
@@ -157,6 +162,7 @@ def plan_detail(request, store_slug, pk):
 @login_required
 def plan_fulfil(request, store_slug, pk):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_procurement')
     plan = get_object_or_404(ProcurementPlan, pk=pk, store=store)
     if plan.status != 'in_progress':
         return redirect('procurement:plan_detail', store_slug=store.slug, pk=pk)
@@ -211,6 +217,7 @@ def plan_fulfil(request, store_slug, pk):
 @require_POST
 def plan_status(request, store_slug, pk):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_procurement')
     plan = get_object_or_404(ProcurementPlan, pk=pk, store=store)
     action = request.POST.get('action')
 

@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
-from django.conf.urls.static import static
+from django.views.static import serve
 
 from core.views import service_worker, offline_view
 
@@ -16,8 +16,6 @@ urlpatterns = [
     path('s/<slug:store_slug>/reports/', include('reports.urls')),
     path('s/<slug:store_slug>/expenses/', include('expenses.urls')),
     path('s/<slug:store_slug>/procurement/', include('procurement.urls')),
+    path('s/<slug:store_slug>/shipments/', include('shipments.urls')),
+    path('media/<path:path>', serve, {'document_root': settings.MEDIA_ROOT}),
 ]
-
-# Serve uploaded media files in all environments.
-# WhiteNoise only handles STATIC_ROOT; user uploads need an explicit handler.
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

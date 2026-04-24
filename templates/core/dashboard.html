@@ -21,7 +21,7 @@
         <div class="card-title">{{ store.name }}</div>
         <div style="font-size:13px;color:var(--text-3)">
           {% if current_role_label %}Signed in as {{ current_role_label }}{% endif %}
-          {% if store.location %} · {{ store.location }}{% endif %}
+          {% if store.location %} | {{ store.location }}{% endif %}
         </div>
       </div>
       {% if can_edit_store %}
@@ -30,9 +30,11 @@
     </div>
   </div>
 
+  {% if can_view_financial_dashboard %}
   {% include 'includes/report_filters.html' %}
+  {% endif %}
 
-  <!-- Period stats -->
+  {% if can_view_financial_dashboard %}
   <div class="stats">
     <div class="stat" style="grid-column:span 2">
       <div class="stat-label">Revenue</div>
@@ -47,6 +49,7 @@
       <div class="stat-value accent">{{ store.currency_symbol }}{{ avg_sale|floatformat:2 }}</div>
     </div>
   </div>
+  {% endif %}
 
   <div class="stats">
     <div class="stat">
@@ -61,46 +64,83 @@
       <div class="stat-label">Out of Stock</div>
       <div class="stat-value danger">{{ out_of_stock }}</div>
     </div>
+    {% if can_manage_preorders %}
     <div class="stat">
       <div class="stat-label">Pre-orders</div>
       <div class="stat-value">{{ pending_preorders }}</div>
     </div>
+    {% endif %}
   </div>
 
-  <!-- Credit overview row -->
+  {% if can_manage_shipments %}
   <div class="stats">
+    <div class="stat">
+      <div class="stat-label">In Transit</div>
+      <div class="stat-value">{{ shipments_in_transit }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">At Port</div>
+      <div class="stat-value">{{ shipments_at_port }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Pending Receiving</div>
+      <div class="stat-value warning">{{ packages_pending_receiving }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Missing Items</div>
+      <div class="stat-value danger">{{ packages_missing_items }}</div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if can_view_financial_dashboard %}
+  <div class="stats">
+    <div class="stat" style="grid-column:span 2">
+      <div class="stat-label">Shipment Costs This Month</div>
+      <div class="stat-value danger">{{ store.currency_symbol }}{{ shipment_expenses_monthly|floatformat:2 }}</div>
+    </div>
+  </div>
+
+  <div class="stats">
+    {% if can_manage_credit %}
     <a href="{% url 'sales:credit_list' store.slug %}" class="stat" style="text-decoration:none;color:inherit">
       <div class="stat-label">Receivables</div>
       <div class="stat-value accent">{{ store.currency_symbol }}{{ total_receivables|floatformat:2 }}</div>
     </a>
+    {% endif %}
     <div class="stat">
       <div class="stat-label">Owed to Suppliers</div>
       <div class="stat-value danger">{{ store.currency_symbol }}{{ supplier_debt|floatformat:2 }}</div>
     </div>
+    {% if can_manage_preorders %}
     <div class="stat">
       <div class="stat-label">Pre-order Backlog</div>
       <div class="stat-value danger">{{ store.currency_symbol }}{{ preorder_obligation|floatformat:2 }}</div>
     </div>
+    {% endif %}
     <div class="stat">
       <div class="stat-label">Net Credit</div>
       <div class="stat-value {% if net_credit >= 0 %}accent{% else %}danger{% endif %}">{{ store.currency_symbol }}{{ net_credit|floatformat:2 }}</div>
     </div>
   </div>
+  {% endif %}
 
   <div class="card">
     <div class="card-title" style="margin-bottom:12px">Quick Actions</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <a href="{% url 'sales:new_sale' store.slug %}" class="btn btn-primary btn-block">New Sale</a>
-      <a href="{% url 'inventory:product_add' store.slug %}" class="btn btn-outline btn-block">Add Product</a>
-      <a href="{% url 'inventory:package_add' store.slug %}" class="btn btn-outline btn-block">New Package</a>
-      <a href="{% url 'preorders:preorder_list' store.slug %}" class="btn btn-outline btn-block">Pre-orders</a>
-      <a href="{% url 'sales:credit_list' store.slug %}" class="btn btn-outline btn-block">Credit Accounts</a>
-      <a href="{% url 'expenses:expense_list' store.slug %}" class="btn btn-outline btn-block">Expenses</a>
-      <a href="{% url 'procurement:plan_list' store.slug %}" class="btn btn-outline btn-block">Procurement</a>
-      <a href="{% url 'inventory:supplier_list' store.slug %}" class="btn btn-outline btn-block">Suppliers</a>
+      {% if can_sell %}<a href="{% url 'sales:new_sale' store.slug %}" class="btn btn-primary btn-block">New Sale</a>{% endif %}
+      {% if can_manage_inventory %}<a href="{% url 'inventory:product_add' store.slug %}" class="btn btn-outline btn-block">Add Product</a>{% endif %}
+      {% if can_manage_inventory %}<a href="{% url 'inventory:package_add' store.slug %}" class="btn btn-outline btn-block">New Package</a>{% endif %}
+      {% if can_manage_preorders %}<a href="{% url 'preorders:preorder_list' store.slug %}" class="btn btn-outline btn-block">Pre-orders</a>{% endif %}
+      {% if can_manage_credit %}<a href="{% url 'sales:credit_list' store.slug %}" class="btn btn-outline btn-block">Credit Accounts</a>{% endif %}
+      {% if can_view_expenses %}<a href="{% url 'expenses:expense_list' store.slug %}" class="btn btn-outline btn-block">Expenses</a>{% endif %}
+      {% if can_manage_procurement %}<a href="{% url 'procurement:plan_list' store.slug %}" class="btn btn-outline btn-block">Procurement</a>{% endif %}
+      {% if can_manage_shipments %}<a href="{% url 'shipments:shipment_list' store.slug %}" class="btn btn-outline btn-block">Shipments</a>{% endif %}
+      {% if can_manage_suppliers %}<a href="{% url 'inventory:supplier_list' store.slug %}" class="btn btn-outline btn-block">Suppliers</a>{% endif %}
     </div>
   </div>
 
+  {% if can_sell %}
   <div class="card">
     <div class="card-header">
       <span class="card-title">Recent Sales</span>
@@ -110,7 +150,7 @@
     <a href="{% url 'sales:sale_detail' store.slug sale.pk %}" class="list-item" style="text-decoration:none;color:inherit;margin:0 -16px;padding:10px 16px">
       <div class="list-content">
         <div class="list-title">{{ sale.receipt_number }}</div>
-        <div class="list-sub">{{ sale.created_at|date:"d M, H:i" }}{% if sale.staff %} · {{ sale.staff.name }}{% endif %}</div>
+        <div class="list-sub">{{ sale.created_at|date:"d M, H:i" }}{% if sale.staff %} | {{ sale.staff.name }}{% endif %}</div>
       </div>
       <div class="list-right">
         <div style="font-weight:600;color:var(--accent)">{{ store.currency_symbol }}{{ sale.total_amount|floatformat:2 }}</div>
@@ -121,6 +161,7 @@
     <div class="empty"><p>No sales yet</p></div>
     {% endfor %}
   </div>
+  {% endif %}
 </div>
 {% endblock %}
 {% block bottomnav %}{% with nav='dashboard' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

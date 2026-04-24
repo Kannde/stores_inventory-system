@@ -17,18 +17,31 @@ HEADERS = [
     ('Paid (YES/NO)', 14),
     ('Preorder (YES/NO)', 18),
     ('Reorder Level', 14),
+    ('Size Options', 22),
+    ('Color Options', 22),
+    ('Image Filename', 22),
 ]
+
+
+def _opts_to_csv(text):
+    """Normalise newline-or-comma separated options to a single comma-separated string."""
+    if not text:
+        return ''
+    import re
+    parts = [p.strip() for p in re.split(r'[,\n]+', text) if p.strip()]
+    return ', '.join(parts)
 
 
 def generate_product_template(store):
     wb = Workbook()
 
+    header_fill = PatternFill('solid', fgColor='D8F3DC')
+    existing_fill = PatternFill('solid', fgColor='EBF5FB')  # light blue for existing rows
+    header_font = Font(bold=True)
+
     # ── Products sheet ───────────────────────────────────────────────────
     ws = wb.active
     ws.title = 'Products'
-
-    header_fill = PatternFill('solid', fgColor='D8F3DC')
-    header_font = Font(bold=True)
 
     for col, (header, width) in enumerate(HEADERS, start=1):
         cell = ws.cell(row=1, column=col, value=header)
@@ -44,26 +57,62 @@ def generate_product_template(store):
     yn_dv.sqref = 'I2:J1048576'
     ws.add_data_validation(yn_dv)
 
-    # Default values in sample row
-    ws.cell(row=2, column=3, value=0)
-    ws.cell(row=2, column=6, value='unit')
-    ws.cell(row=2, column=9, value='YES')
-    ws.cell(row=2, column=10, value='NO')
-    ws.cell(row=2, column=11, value=5)
-
-    # Note on Supplier Phone column
-    phone_comment = Comment(
+    # Comments
+    ws['A1'].comment = Comment(
+        'Existing products are pre-filled below (blue rows).\n'
+        'Add new products beneath them.\n'
+        'Product Name and Unit Price are required.\nSKU will be auto-generated.',
+        'SalesApp',
+    )
+    ws['H1'].comment = Comment(
         'If Paid = NO, Supplier Name is required.\nPhone helps identify existing suppliers.',
-        'SalesApp'
+        'SalesApp',
     )
-    ws['H1'].comment = phone_comment
+    ws['L1'].comment = Comment(
+        'Comma-separated size variants, e.g: S, M, L, XL\nLeave blank if product has no sizes.',
+        'SalesApp',
+    )
+    ws['M1'].comment = Comment(
+        'Comma-separated colour variants, e.g: Red, Blue, Green\nLeave blank if product has no colours.',
+        'SalesApp',
+    )
+    ws['N1'].comment = Comment(
+        'Base filename of the product image WITHOUT extension.\n'
+        'e.g. sneakers_red   →  matches sneakers_red.png\n'
+        'Multiple images: sneakers_red1.png, sneakers_red2.png\n'
+        'Upload a ZIP of all images in the form alongside this sheet.',
+        'SalesApp',
+    )
 
-    # Instruction comment on A1
-    comment = Comment(
-        'Fill in your products below.\nProduct Name and Unit Price are required.\nSKU will be auto-generated.',
-        'SalesApp'
+    # Pre-fill existing products
+    products = (
+        store.products
+        .select_related('category', 'supplier')
+        .prefetch_related('variants')
+        .order_by('name')
     )
-    ws['A1'].comment = comment
+    row = 2
+    for p in products:
+        data = [
+            p.name,
+            p.category.name if p.category else '',
+            p.stock_qty,
+            float(p.unit_price),
+            float(p.cost_price) if p.cost_price else '',
+            p.unit_label,
+            p.supplier.name if p.supplier else '',
+            p.supplier.phone if p.supplier and p.supplier.phone else '',
+            'YES' if p.is_paid else 'NO',
+            'YES' if p.available_for_preorder else 'NO',
+            p.reorder_level,
+            _opts_to_csv(p.size_options),
+            _opts_to_csv(p.color_options),
+            '',  # image filename — not stored, left blank
+        ]
+        for col, val in enumerate(data, start=1):
+            cell = ws.cell(row=row, column=col, value=val)
+            cell.fill = existing_fill
+        row += 1
 
     # ── Categories reference sheet ───────────────────────────────────────
     ws2 = wb.create_sheet('Categories')
@@ -75,5 +124,46 @@ def generate_product_template(store):
         ws2.cell(row=i, column=1, value=cat.name)
 
     ws2.sheet_state = 'visible'
+
+    # ── Variants sheet ───────────────────────────────────────────────────
+    ws3 = wb.create_sheet('Variants')
+    var_headers = [
+        ('Product Name', 30),
+        ('Size', 15),
+        ('Color', 15),
+        ('Quantity', 14),
+    ]
+    for col, (h, w) in enumerate(var_headers, start=1):
+        cell = ws3.cell(row=1, column=col, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center')
+        ws3.column_dimensions[get_column_letter(col)].width = w
+
+    ws3.freeze_panes = 'A2'
+    ws3['A1'].comment = Comment(
+        'Products with size/colour variations are pre-filled here (blue rows).\n'
+        'Each row is one variant combination with its stock quantity.\n'
+        'Product Name must match exactly a product in the Products sheet.\n'
+        'Leave Size or Color blank if the product only varies on one dimension.\n'
+        'The Quantity in the Products sheet is ignored for products listed here —\n'
+        'total stock is calculated as the sum of all variant rows.',
+        'SalesApp',
+    )
+
+    # Pre-fill existing variants (only products that actually have variants)
+    vrow = 2
+    for p in products:
+        variants = list(p.variants.all())
+        if not variants:
+            continue
+        for v in variants:
+            vdata = [p.name, v.size, v.color, v.stock_qty]
+            for col, val in enumerate(vdata, start=1):
+                cell = ws3.cell(row=vrow, column=col, value=val)
+                cell.fill = existing_fill
+            vrow += 1
+
+    ws3.sheet_state = 'visible'
 
     return wb

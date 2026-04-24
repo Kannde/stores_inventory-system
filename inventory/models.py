@@ -5,6 +5,16 @@ from django.db.models import Sum, F
 from core.models import Store
 
 
+def _parse_option_text(raw_value):
+    values = []
+    for line in (raw_value or "").replace("\r", "\n").splitlines():
+        for item in line.split(","):
+            cleaned = item.strip()
+            if cleaned:
+                values.append(cleaned)
+    return values
+
+
 class Category(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='categories')
@@ -110,6 +120,7 @@ class Product(models.Model):
     name = models.CharField(max_length=300)
     sku = models.CharField(max_length=50, blank=True)
     description = models.TextField(blank=True)
+    preorder_description = models.TextField(blank=True, help_text='Shown to customers on the preorder page')
     unit_price = models.DecimalField(max_digits=12, decimal_places=2)
     cost_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     unit_label = models.CharField(max_length=30, default='unit', help_text='e.g. piece, kg, bag, bottle')
@@ -120,6 +131,10 @@ class Product(models.Model):
     is_paid = models.BooleanField(default=True, help_text='False if stock was taken on credit from supplier')
     available_for_preorder = models.BooleanField(default=False)
     preorder_lead_days = models.PositiveIntegerField(null=True, blank=True, help_text='Expected days to fulfil a preorder for this product')
+    has_color_variants = models.BooleanField(default=False)
+    color_options = models.TextField(blank=True, help_text='One color per line or comma-separated')
+    has_size_variants = models.BooleanField(default=False)
+    size_options = models.TextField(blank=True, help_text='One size per line or comma-separated')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -155,6 +170,48 @@ class Product(models.Model):
             return None
         from django.utils import timezone
         return (self.expiry_date - timezone.now().date()).days
+
+    @property
+    def preorder_description_text(self):
+        return self.preorder_description or self.description
+
+    @property
+    def color_option_list(self):
+        if not self.has_color_variants:
+            return []
+        return _parse_option_text(self.color_options)
+
+    @property
+    def size_option_list(self):
+        if not self.has_size_variants:
+            return []
+        return _parse_option_text(self.size_options)
+
+    @property
+    def has_variants(self):
+        return self.has_size_variants or self.has_color_variants
+
+    def sync_stock_from_variants(self):
+        total = self.variants.aggregate(t=Sum('stock_qty'))['t'] or 0
+        Product.objects.filter(pk=self.pk).update(stock_qty=total)
+        self.stock_qty = total
+
+
+class ProductVariant(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants')
+    size = models.CharField(max_length=50, blank=True)
+    color = models.CharField(max_length=50, blank=True)
+    stock_qty = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['color', 'size']
+        unique_together = ['product', 'size', 'color']
+
+    def __str__(self):
+        parts = [p for p in [self.color, self.size] if p]
+        label = ' / '.join(parts) if parts else 'Default'
+        return f"{self.product.name} — {label}"
 
 
 class ProductImage(models.Model):

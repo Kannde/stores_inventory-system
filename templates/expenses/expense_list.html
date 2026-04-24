@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}Expenses — {{ store.name }}{% endblock %}
+{% block title %}Expenses - {{ store.name }}{% endblock %}
 
 {% block topnav %}
 <div class="topnav">
@@ -23,25 +23,19 @@
 </style>
 
 <div class="container" style="padding-bottom:100px">
-
-  <!-- Month picker -->
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
     <input type="month" id="monthPicker" value="{{ month }}"
       class="form-input" style="flex:1;font-size:15px"
       onchange="window.location.href='?month='+this.value+'{% if selected_cat %}&cat={{ selected_cat }}{% endif %}'">
   </div>
 
-  <!-- Category filter chips -->
   <div class="tabs" style="margin-bottom:14px">
-    <button class="cat-chip {% if not selected_cat %}active{% endif %}"
-      onclick="filterCat('')">All</button>
+    <button class="cat-chip {% if not selected_cat %}active{% endif %}" onclick="filterCat('')">All</button>
     {% for val, label in category_choices %}
-    <button class="cat-chip {% if selected_cat == val %}active{% endif %}"
-      onclick="filterCat('{{ val }}')">{{ label }}</button>
+    <button class="cat-chip {% if selected_cat == val %}active{% endif %}" onclick="filterCat('{{ val }}')">{{ label }}</button>
     {% endfor %}
   </div>
 
-  <!-- Summary card -->
   <div class="card" style="margin-bottom:14px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <span class="card-title">{{ month|slice:":4" }}-{{ month|slice:"5:" }} Total</span>
@@ -51,10 +45,7 @@
     <div style="display:flex;flex-direction:column;gap:6px">
       {% for row in by_category %}
       <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
-        <div style="display:flex;align-items:center;gap:6px">
-          <div class="cat-dot" style="background:{{ row.category|slugify }}-color"></div>
-          <span>{{ row.category|title }}</span>
-        </div>
+        <span>{{ row.category|title }}</span>
         <span style="font-weight:600">{{ store.currency_symbol }}{{ row.total|floatformat:2 }}</span>
       </div>
       {% endfor %}
@@ -62,7 +53,6 @@
     {% endif %}
   </div>
 
-  <!-- Expense list -->
   <div class="card">
     <div class="card-header">
       <span class="card-title">Entries</span>
@@ -73,18 +63,23 @@
     <div class="exp-row">
       <div class="cat-dot" style="background:var(--cat-{{ exp.category }},var(--accent))"></div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:500">{{ exp.get_category_display }}
-          {% if exp.product %}<span style="font-size:11px;color:var(--text-3)"> · {{ exp.product.name }}{% if exp.product_qty > 1 %} ×{{ exp.product_qty }}{% endif %}</span>{% endif %}
+        <div style="font-size:14px;font-weight:500">
+          {{ exp.get_category_display }}
+          {% if exp.product %}
+          <span style="font-size:11px;color:var(--text-3)"> | {{ exp.product.name }}{% if exp.product_qty > 1 %} x{{ exp.product_qty }}{% endif %}</span>
+          {% endif %}
+          {% if exp.shipment %}
+          <span style="font-size:11px;color:var(--text-3)"> | Shipment {{ exp.shipment.tracking_number }}</span>
+          {% endif %}
         </div>
         <div style="font-size:12px;color:var(--text-3)">
-          {{ exp.date|date:"d M Y" }}{% if exp.recorded_by %} · {{ exp.recorded_by.name }}{% endif %}
-          {% if exp.description %} · {{ exp.description }}{% endif %}
+          {{ exp.date|date:"d M Y" }}{% if exp.recorded_by %} | {{ exp.recorded_by.name }}{% endif %}{% if exp.description %} | {{ exp.description }}{% endif %}
         </div>
       </div>
       <div style="font-weight:600;color:var(--danger);flex-shrink:0">{{ store.currency_symbol }}{{ exp.amount|floatformat:2 }}</div>
       <form method="post" action="{% url 'expenses:expense_delete' store.slug exp.pk %}" style="margin:0" onsubmit="return confirm('Delete this expense?')">
         {% csrf_token %}
-        <button type="submit" style="background:none;border:none;color:var(--text-3);cursor:pointer;padding:4px;font-size:18px;line-height:1">×</button>
+        <button type="submit" style="background:none;border:none;color:var(--text-3);cursor:pointer;padding:4px;font-size:18px;line-height:1">x</button>
       </form>
     </div>
     {% endfor %}
@@ -95,10 +90,8 @@
     </div>
     {% endif %}
   </div>
-
 </div>
 
-<!-- Add Expense Modal -->
 <div class="modal-overlay" id="addModal">
   <div class="modal-sheet" style="max-height:90vh;overflow-y:auto">
     <div class="modal-handle"></div>
@@ -116,25 +109,31 @@
         </select>
       </div>
 
-      <!-- Product picker — shown for breakage / expiry -->
       <div id="productSection" style="display:none">
         <div class="form-group">
           <label class="form-label">Product</label>
           <select id="productSelect" name="product_id" class="form-select" onchange="handleProductSelect(this.value)">
-            <option value="">— Select product —</option>
+            <option value="">- Select product -</option>
           </select>
         </div>
         <div class="form-group">
           <label class="form-label" id="qtyLabel">Quantity</label>
-          <input type="number" name="product_qty" id="productQty" class="form-input"
-            min="1" value="1" inputmode="numeric" onchange="recalcCost()">
+          <input type="number" name="product_qty" id="productQty" class="form-input" min="1" value="1" inputmode="numeric" onchange="recalcCost()">
+        </div>
+      </div>
+
+      <div id="shipmentSection" style="display:none">
+        <div class="form-group">
+          <label class="form-label">Shipment</label>
+          <select id="shipmentSelect" name="shipment_id" class="form-select">
+            <option value="">- Select shipment -</option>
+          </select>
         </div>
       </div>
 
       <div class="form-group">
         <label class="form-label">Amount ({{ store.currency_symbol }}) *</label>
-        <input type="number" name="amount" id="amountInput" class="form-input"
-          step="0.01" inputmode="decimal" required style="font-size:20px;font-weight:700;text-align:center">
+        <input type="number" name="amount" id="amountInput" class="form-input" step="0.01" inputmode="decimal" required style="font-size:20px;font-weight:700;text-align:center">
       </div>
 
       <div class="form-group">
@@ -150,7 +149,7 @@
       <div class="form-group">
         <label class="form-label">Recorded By</label>
         <select name="recorded_by" class="form-select">
-          <option value="">— Not specified —</option>
+          <option value="">- Not specified -</option>
           {% for s in staff %}
           <option value="{{ s.id }}">{{ s.name }}</option>
           {% endfor %}
@@ -169,23 +168,10 @@
 {% block scripts %}
 <script>
 const PRODUCTS = {{ products_json|safe }};
+const SHIPMENTS = {{ shipments_json|safe }};
 const CURRENCY = '{{ store.currency_symbol }}';
-
-// Category colours (CSS custom props fallback)
-const CAT_COLORS = {
-  salary:'#2563eb', transport:'#e07a1b', marketing:'#9333ea',
-  breakage:'#c1121f', expiry:'#dc2626', utilities:'#0891b2',
-  rent:'#059669', other:'#6b7280',
-};
-document.querySelectorAll('.cat-dot').forEach(dot => {
-  const cat = dot.closest('[data-cat]')?.dataset.cat;
-});
-
-// Set dot colours from inline style attribute pattern
-document.querySelectorAll('.exp-row .cat-dot').forEach((dot, i) => {
-  const cats = {{ expenses|length }};
-  // colours already set via inline style; this is a no-op placeholder
-});
+const SHIPMENT_CATEGORIES = ['freight', 'customs', 'clearing', 'transport'];
+let selectedProduct = null;
 
 function filterCat(val) {
   const month = document.getElementById('monthPicker').value;
@@ -193,28 +179,36 @@ function filterCat(val) {
 }
 
 function openAddModal() {
-  document.getElementById('dateInput').value = new Date().toISOString().slice(0,10);
+  document.getElementById('dateInput').value = new Date().toISOString().slice(0, 10);
   document.getElementById('addModal').classList.add('open');
+  handleCategoryChange(document.getElementById('categorySelect').value);
 }
+
 function closeAddModal() {
   document.getElementById('addModal').classList.remove('open');
 }
 
-let selectedProduct = null;
-
 function handleCategoryChange(cat) {
-  const show = cat === 'breakage' || cat === 'expiry';
-  document.getElementById('productSection').style.display = show ? 'block' : 'none';
+  const showProduct = cat === 'breakage' || cat === 'expiry';
+  const showShipment = SHIPMENT_CATEGORIES.includes(cat);
+  document.getElementById('productSection').style.display = showProduct ? 'block' : 'none';
+  document.getElementById('shipmentSection').style.display = showShipment ? 'block' : 'none';
   document.getElementById('qtyLabel').textContent = cat === 'expiry' ? 'Units Written Off' : 'Quantity Broken';
-  if (show) populateProductSelect(cat);
-  else { selectedProduct = null; }
+  if (showProduct) populateProductSelect();
+  if (showShipment) populateShipmentSelect();
+  if (!showProduct) selectedProduct = null;
 }
 
-function populateProductSelect(cat) {
+function populateProductSelect() {
   const sel = document.getElementById('productSelect');
-  const today = new Date().toISOString().slice(0,10);
-  sel.innerHTML = '<option value="">— Select product —</option>' +
+  sel.innerHTML = '<option value="">- Select product -</option>' +
     PRODUCTS.map(p => `<option value="${p.id}">${p.name} (cost: ${CURRENCY}${parseFloat(p.cost_price).toFixed(2)}/${p.unit_label})</option>`).join('');
+}
+
+function populateShipmentSelect() {
+  const sel = document.getElementById('shipmentSelect');
+  sel.innerHTML = '<option value="">- Select shipment -</option>' +
+    SHIPMENTS.map(s => `<option value="${s.id}">${s.tracking_number} (${s.shipping_company})</option>`).join('');
 }
 
 function handleProductSelect(id) {
@@ -224,20 +218,15 @@ function handleProductSelect(id) {
 
 function recalcCost() {
   if (!selectedProduct) return;
-  const qty = parseInt(document.getElementById('productQty').value) || 1;
+  const qty = parseInt(document.getElementById('productQty').value, 10) || 1;
   const cost = parseFloat(selectedProduct.cost_price) * qty;
   document.getElementById('amountInput').value = cost.toFixed(2);
 }
 
 document.querySelectorAll('.modal-overlay').forEach(el => {
-  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
-});
-
-// Colour dots by category name from DOM
-document.querySelectorAll('.exp-row').forEach(row => {
-  const dot = row.querySelector('.cat-dot');
-  const text = row.querySelector('[style*="font-weight:500"]')?.textContent?.trim().toLowerCase();
-  // Use category value from data if available — otherwise leave default accent
+  el.addEventListener('click', e => {
+    if (e.target === el) el.classList.remove('open');
+  });
 });
 </script>
 {% endblock %}

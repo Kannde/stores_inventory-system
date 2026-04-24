@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from .access import (
     can_manage_staff,
+    get_store_capabilities,
     get_post_login_redirect,
     get_store_for_user,
     get_store_role_label,
@@ -30,11 +31,13 @@ def get_store(store_slug, user=None):
 
 
 def build_store_permissions(user, store):
-    return {
+    permissions = get_store_capabilities(user, store)
+    permissions.update({
         'can_edit_store': is_store_owner(user, store),
         'can_manage_staff': can_manage_staff(user, store),
         'current_role_label': get_store_role_label(user, store),
-    }
+    })
+    return permissions
 
 
 def home(request):
@@ -203,7 +206,9 @@ def store_dashboard(request, store_slug):
     from django.db.models import ExpressionWrapper, DecimalField
     from inventory.models import Product, Category, Supplier
     from preorders.models import PreOrder, PreOrderItem
+    from shipments.models import Shipment, ShipmentPackage
     from sales.models import Sale, CreditAccount, SaleItem
+    from expenses.models import Expense
     from core.date_filter import resolve_period, parse_entity_filters
 
     pf = resolve_period(request, today, default='this_week')
@@ -257,6 +262,15 @@ def store_dashboard(request, store_slug):
         store=store, is_active=True, outstanding_balance__gt=0,
     ).aggregate(total=Sum('outstanding_balance'))['total'] or 0
 
+    current_month = today.month
+    current_year = today.year
+    shipment_expenses = Expense.objects.filter(
+        store=store,
+        shipment__isnull=False,
+        date__year=current_year,
+        date__month=current_month,
+    ).aggregate(total=Sum('amount'))['total'] or 0
+
     _po_expr = ExpressionWrapper(F('quantity') * F('unit_price'), output_field=DecimalField())
     preorder_obligation = PreOrderItem.objects.filter(
         preorder__store=store,
@@ -288,6 +302,14 @@ def store_dashboard(request, store_slug):
         'supplier_debt': supplier_debt,
         'preorder_obligation': preorder_obligation,
         'net_credit': net_credit,
+        'shipments_in_transit': Shipment.objects.filter(store=store, status='TRANSIT').count(),
+        'shipments_at_port': Shipment.objects.filter(store=store, status='PORT').count(),
+        'packages_pending_receiving': ShipmentPackage.objects.filter(shipment__store=store, is_received=False).count(),
+        'packages_missing_items': ShipmentPackage.objects.filter(
+            shipment__store=store,
+            items__received_quantity__lt=F('items__expected_quantity'),
+        ).distinct().count(),
+        'shipment_expenses_monthly': shipment_expenses,
         'filter_staff': filter_staff,
         'filter_categories': filter_categories,
         'filter_products': filter_products,
@@ -391,6 +413,7 @@ def store_settings(request, store_slug):
         settings_obj.preorder_welcome_message = request.POST.get('preorder_welcome_message', '')
         settings_obj.preorder_whatsapp_number = request.POST.get('preorder_whatsapp_number', '')
         settings_obj.preorder_all_products = request.POST.get('preorder_all_products') == 'on'
+        settings_obj.manager_can_manage_shipments = request.POST.get('manager_can_manage_shipments') == 'on'
         settings_obj.save()
         messages.success(request, 'Store settings updated.')
         return redirect('core:store_settings', store_slug=store.slug)

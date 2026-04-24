@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% block title %}Receive {{ package.package_code }} - {{ store.name }}{% endblock %}
+
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'shipments:shipment_detail' store.slug package.shipment.pk %}" class="back">&larr;</a>
+  <h1 style="font-size:15px">{{ package.package_code }}</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-bottom:120px">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div>
+        <div style="font-size:18px;font-weight:700">{{ package.package_code }}</div>
+        <div style="font-size:12px;color:var(--text-3);margin-top:4px">Shipment {{ package.shipment.tracking_number }}</div>
+        {% if package.supplier %}<div style="font-size:12px;color:var(--text-3);margin-top:4px">{{ package.supplier.name }}</div>{% endif %}
+      </div>
+      <span class="badge {% if package.is_received %}badge-success{% elif package.missing_items_count %}badge-danger{% else %}badge-warning{% endif %}">
+        {% if package.is_received %}Received{% elif package.missing_items_count %}Missing {{ package.missing_quantity_total }}{% else %}Pending{% endif %}
+      </span>
+    </div>
+    {% if package.description %}<div style="font-size:13px;color:var(--text-2);margin-top:10px">{{ package.description }}</div>{% endif %}
+    {% if package.is_stocked %}<div style="font-size:12px;color:var(--accent);margin-top:10px">Inventory has already been posted for this package.</div>{% endif %}
+  </div>
+
+  <form method="post" id="receiveForm">
+    {% csrf_token %}
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px">Verify Items</div>
+      {% for item in package.items.all %}
+      <div class="package-item-card" style="padding:14px 0;border-bottom:1px solid var(--border){% if forloop.last %};border-bottom:none{% endif %}">
+
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+          <div>
+            <div style="font-size:14px;font-weight:700">{{ item.product.name }}{% if item.variant_color or item.variant_size %} <span style="font-size:12px;font-weight:400;color:var(--text-2)">{% if item.variant_color %}{{ item.variant_color }}{% endif %}{% if item.variant_color and item.variant_size %} / {% endif %}{% if item.variant_size %}{{ item.variant_size }}{% endif %}</span>{% endif %}</div>
+            {% if item.product.sku %}<div style="font-size:11px;color:var(--text-3)">{{ item.product.sku }}</div>{% endif %}
+            <div style="font-size:12px;color:var(--text-3);margin-top:3px">Expected: <strong>{{ item.expected_quantity }}</strong></div>
+          </div>
+          <div style="font-size:12px;font-weight:700;color:{% if item.missing_quantity %}var(--danger){% else %}var(--accent){% endif %};text-align:right">
+            <span class="status-text" data-expected="{{ item.expected_quantity }}" data-input="received_{{ item.pk }}">
+              {% if item.missing_quantity %}Missing {{ item.missing_quantity }}{% else %}Complete{% endif %}
+            </span>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+          <div class="form-group">
+            <label class="form-label">Received Qty</label>
+            <input type="number" min="0" name="received_{{ item.pk }}" class="form-input receive-input"
+              value="{{ item.received_quantity }}" data-expected="{{ item.expected_quantity }}" data-pk="{{ item.pk }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cost Price / Unit</label>
+            <input type="number" min="0" step="0.01" name="cost_price_{{ item.pk }}" class="form-input"
+              value="{{ item.cost_price|default:'' }}" placeholder="{{ item.product.cost_price|floatformat:2 }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Selling Price / Unit</label>
+            <input type="number" min="0" step="0.01" name="unit_price_{{ item.pk }}" class="form-input"
+              value="{{ item.unit_price|default:'' }}" placeholder="{{ item.product.unit_price|floatformat:2 }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notes</label>
+            <input type="text" name="notes_{{ item.pk }}" class="form-input" value="{{ item.notes }}">
+          </div>
+        </div>
+
+        <div class="shortage-row" id="shortage_{{ item.pk }}" style="{% if not item.missing_quantity %}display:none;{% endif %}margin-top:8px">
+          <div class="form-group">
+            <label class="form-label" style="color:var(--danger)">Shortage Reason</label>
+            <input type="text" name="shortage_reason_{{ item.pk }}" class="form-input"
+              value="{{ item.shortage_reason }}" placeholder="Damaged, short-shipped, missing...">
+          </div>
+        </div>
+
+      </div>
+      {% endfor %}
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button type="submit" name="action" value="save" class="btn btn-outline" style="flex:1">Save Progress</button>
+      {% if not package.is_stocked %}
+      <button type="button" id="confirmBtn" class="btn btn-primary" style="flex:1" onclick="openConfirmModal()">Confirm Receipt</button>
+      {% else %}
+      <button type="button" class="btn btn-primary" style="flex:1;opacity:0.5" disabled>Already Stocked</button>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+{% if not package.is_stocked %}
+<div id="confirmModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;align-items:flex-end;justify-content:center">
+  <div style="background:var(--surface);border-radius:16px 16px 0 0;padding:24px;max-width:480px;width:100%">
+    <div style="font-size:16px;font-weight:700;margin-bottom:8px">Confirm Receipt</div>
+    <div id="confirmMessage" style="font-size:14px;color:var(--text-2);margin-bottom:20px"></div>
+    <div style="display:flex;gap:8px">
+      <button type="button" class="btn btn-outline" style="flex:1" onclick="closeConfirmModal()">Cancel</button>
+      <button type="button" id="confirmSubmitBtn" class="btn btn-primary" style="flex:1" onclick="submitComplete()">Confirm & Push to Stock</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function syncReceiveState() {
+  let totalMissing = 0;
+  document.querySelectorAll('.status-text').forEach(label => {
+    const expected = parseInt(label.dataset.expected, 10) || 0;
+    const input = document.querySelector(`[name="${label.dataset.input}"]`);
+    const received = parseInt(input.value, 10) || 0;
+    const missing = Math.max(expected - received, 0);
+    label.textContent = missing ? `Missing ${missing}` : 'Complete';
+    label.style.color = missing ? 'var(--danger)' : 'var(--accent)';
+    totalMissing += missing;
+
+    const pk = input.dataset.pk;
+    const shortageRow = document.getElementById(`shortage_${pk}`);
+    if (shortageRow) shortageRow.style.display = missing ? 'block' : 'none';
+  });
+  return totalMissing;
+}
+
+function openConfirmModal() {
+  const missing = syncReceiveState();
+  const msg = document.getElementById('confirmMessage');
+  if (missing > 0) {
+    msg.innerHTML = `<span style="color:var(--danger);font-weight:600">${missing} item(s) are short.</span> Received quantities will be pushed to stock. Missing items will remain unresolved on this package.`;
+  } else {
+    msg.textContent = 'All items accounted for. This will push received stock to inventory and mark the package complete.';
+  }
+  document.getElementById('confirmModal').style.display = 'flex';
+}
+
+function closeConfirmModal() {
+  document.getElementById('confirmModal').style.display = 'none';
+}
+
+function submitComplete() {
+  const form = document.getElementById('receiveForm');
+  const hidden = document.createElement('input');
+  hidden.type = 'hidden';
+  hidden.name = 'action';
+  hidden.value = 'complete';
+  form.appendChild(hidden);
+  form.submit();
+}
+
+document.querySelectorAll('.receive-input').forEach(input => {
+  input.addEventListener('input', syncReceiveState);
+});
+
+syncReceiveState();
+
+document.getElementById('confirmModal')?.addEventListener('click', function(e) {
+  if (e.target === this) closeConfirmModal();
+});
+</script>
+{% endblock %}
+
+{% block bottomnav %}{% with nav='dashboard' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

@@ -8,6 +8,7 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 
+from core.access import require_store_permission
 from core.views import get_store
 from core.date_filter import resolve_period, parse_entity_filters
 from core.models import StoreStaff
@@ -19,6 +20,7 @@ from sales.models import Sale, SaleItem
 @login_required
 def dashboard(request, store_slug):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'view_reports')
     today = timezone.now().date()
 
     pf = resolve_period(request, today, default='this_month')
@@ -184,6 +186,7 @@ def dashboard(request, store_slug):
 @login_required
 def api_sales_chart(request, store_slug):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'view_reports')
     days = int(request.GET.get('days', 7))
     today = timezone.now().date()
     data = []
@@ -200,6 +203,7 @@ def api_sales_chart(request, store_slug):
 @login_required
 def api_top_products(request, store_slug):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'view_reports')
     days = int(request.GET.get('days', 7))
     start = timezone.now().date() - timedelta(days=days)
     top = SaleItem.objects.filter(

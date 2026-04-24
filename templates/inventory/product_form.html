@@ -122,20 +122,32 @@
 
     <div class="card">
       <div class="card-title" style="margin-bottom:12px">Stock</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+
+      <!-- Plain qty — hidden when variant form is active -->
+      <div id="plainStockSection">
         <div class="form-group">
           <label class="form-label">Current Stock</label>
-          <input type="number" name="stock_qty" class="form-input" value="{{ product.stock_qty|default:'0' }}">
+          <input type="number" name="stock_qty" id="stockQtyInput" class="form-input" value="{{ product.stock_qty|default:'0' }}">
         </div>
+      </div>
+
+      <!-- Variant stock table — shown when size or color variants are enabled -->
+      <div id="variantStockSection" style="display:none">
+        <div style="font-size:12px;color:var(--text-3);margin-bottom:10px">Enter stock quantity for each variant. Total is calculated automatically.</div>
+        <div id="variantStockTable"></div>
+        <input type="hidden" name="variants_json" id="variantsJsonInput">
+        <input type="hidden" name="variant_form_active" id="variantFormActive" value="0">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
         <div class="form-group">
           <label class="form-label">Reorder Level</label>
           <input type="number" name="reorder_level" class="form-input" value="{{ product.reorder_level|default:'5' }}">
         </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Expiry Date</label>
-        <input type="date" name="expiry_date" class="form-input" value="{{ product.expiry_date|date:'Y-m-d'|default:'' }}">
-        <div style="font-size:11px;color:var(--text-3);margin-top:3px">Leave blank if product has no expiry</div>
+        <div class="form-group">
+          <label class="form-label">Expiry Date</label>
+          <input type="date" name="expiry_date" class="form-input" value="{{ product.expiry_date|date:'Y-m-d'|default:'' }}">
+        </div>
       </div>
     </div>
 
@@ -159,7 +171,14 @@
         {% endfor %}
       </div>
       {% endif %}
-      <input type="file" name="images" class="form-input" accept="image/*" multiple>
+      <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">
+        Selected images stay here until you save the product, so you can reopen the picker and add more photos for preorder items.
+      </div>
+      <input type="file" name="images" id="imagesInput" class="form-input" accept="image/*" multiple>
+      <div id="pendingImages" style="display:none;margin-top:12px">
+        <div style="font-size:12px;font-weight:600;color:var(--text-3);margin-bottom:8px">Images to upload</div>
+        <div id="pendingImagesGrid" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+      </div>
     </div>
 
     <div class="card">
@@ -176,6 +195,41 @@
           value="{{ product.preorder_lead_days|default:'' }}" style="max-width:140px">
         <div style="font-size:11px;color:var(--text-3);margin-top:4px">Shown to customers when they select this product. Leave blank to use the store default.</div>
       </div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+        <label class="form-label">Pre-order Description</label>
+        <textarea name="preorder_description" class="form-textarea" rows="3" placeholder="What should customers know before ordering this item?">{{ product.preorder_description|default:'' }}</textarea>
+        <div style="font-size:11px;color:var(--text-3);margin-top:4px">Shown in the customer preorder catalog. Leave blank to reuse the main description.</div>
+      </div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:grid;gap:14px">
+        <div>
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer">
+            <input type="checkbox" name="has_color_variants" id="colorToggle" {% if product.has_color_variants %}checked{% endif %} style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0" onchange="toggleVariantSection('color')">
+            <div>
+              <div style="font-weight:600;font-size:14px">Offer color variations</div>
+              <div style="font-size:12px;color:var(--text-3);margin-top:2px">Customers can choose a color before submitting the preorder.</div>
+            </div>
+          </label>
+          <div id="colorSection" style="display:{% if product.has_color_variants %}block{% else %}none{% endif %};margin-top:10px">
+            <label class="form-label">Available Colors</label>
+            <textarea name="color_options" class="form-textarea" rows="3" placeholder="Black, White, Blue">{{ product.color_options|default:'' }}</textarea>
+            <div style="font-size:11px;color:var(--text-3);margin-top:4px">Enter one per line or separate with commas.</div>
+          </div>
+        </div>
+        <div>
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer">
+            <input type="checkbox" name="has_size_variants" id="sizeToggle" {% if product.has_size_variants %}checked{% endif %} style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0" onchange="toggleVariantSection('size')">
+            <div>
+              <div style="font-weight:600;font-size:14px">Offer size variations</div>
+              <div style="font-size:12px;color:var(--text-3);margin-top:2px">Customers can choose a size before submitting the preorder.</div>
+            </div>
+          </label>
+          <div id="sizeSection" style="display:{% if product.has_size_variants %}block{% else %}none{% endif %};margin-top:10px">
+            <label class="form-label">Available Sizes</label>
+            <textarea name="size_options" class="form-textarea" rows="3" placeholder="Small, Medium, Large">{{ product.size_options|default:'' }}</textarea>
+            <div style="font-size:11px;color:var(--text-3);margin-top:4px">Enter one per line or separate with commas.</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <button type="submit" class="btn btn-primary btn-block" style="margin-top:4px">
@@ -186,8 +240,137 @@
 {% endblock %}
 {% block scripts %}
 <script>
+const EXISTING_VARIANTS = {{ existing_variants_json|safe }};
+
 function toggleLeadDays(cb) {
   document.getElementById('leadDaysSection').style.display = cb.checked ? 'block' : 'none';
+}
+
+function toggleVariantSection(kind) {
+  const toggle = document.getElementById(kind + 'Toggle');
+  document.getElementById(kind + 'Section').style.display = toggle.checked ? 'block' : 'none';
+  renderVariantTable();
+}
+
+function _parseOpts(txt) {
+  return txt.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+}
+
+function _esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderVariantTable() {
+  const hasSizes  = document.getElementById('sizeToggle').checked;
+  const hasColors = document.getElementById('colorToggle').checked;
+  const hasVariants = hasSizes || hasColors;
+
+  document.getElementById('plainStockSection').style.display  = hasVariants ? 'none' : 'block';
+  document.getElementById('variantStockSection').style.display = hasVariants ? 'block' : 'none';
+  document.getElementById('variantFormActive').value = hasVariants ? '1' : '0';
+
+  if (!hasVariants) return;
+
+  const sizes  = hasSizes  ? _parseOpts(document.querySelector('[name=size_options]').value)  : [];
+  const colors = hasColors ? _parseOpts(document.querySelector('[name=color_options]').value) : [];
+
+  // Build flat list of (size, color) combos
+  let combos = [];
+  if (sizes.length && colors.length) {
+    sizes.forEach(sz => colors.forEach(cl => combos.push({size: sz, color: cl})));
+  } else if (sizes.length) {
+    sizes.forEach(sz => combos.push({size: sz, color: ''}));
+  } else {
+    colors.forEach(cl => combos.push({size: '', color: cl}));
+  }
+
+  const table = document.getElementById('variantStockTable');
+  if (!combos.length) {
+    table.innerHTML = '<div style="font-size:13px;color:var(--text-3);padding:8px 0">Enter size and/or color options above to define variant stock.</div>';
+    return;
+  }
+
+  const showSize  = hasSizes  && sizes.length  > 0;
+  const showColor = hasColors && colors.length > 0;
+  const colTemplate = showSize && showColor ? '1fr 1fr 90px' : '1fr 90px';
+
+  let html = '<div style="background:var(--surface-2);border-radius:var(--radius);overflow:hidden">';
+
+  // Header
+  html += `<div style="display:grid;grid-template-columns:${colTemplate};gap:0;background:var(--surface-2);padding:8px 12px;border-bottom:1px solid var(--border)">`;
+  if (showSize)  html += '<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px">Size</div>';
+  if (showColor) html += '<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px">Color</div>';
+  html += '<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px">Qty</div>';
+  html += '</div>';
+
+  // Rows
+  combos.forEach((combo, idx) => {
+    const key = `${combo.size}|${combo.color}`;
+    const qty = EXISTING_VARIANTS[key] || 0;
+    const border = idx < combos.length - 1 ? 'border-bottom:1px solid var(--border)' : '';
+    html += `<div class="variant-row" data-size="${_esc(combo.size)}" data-color="${_esc(combo.color)}" style="display:grid;grid-template-columns:${colTemplate};gap:0;padding:8px 12px;align-items:center;${border}">`;
+    if (showSize)  html += `<div style="font-size:13px;font-weight:600">${_esc(combo.size)}</div>`;
+    if (showColor) html += `<div style="font-size:13px">${_esc(combo.color)}</div>`;
+    html += `<input type="number" min="0" class="form-input variant-qty" value="${qty}" style="padding:5px 8px;height:34px">`;
+    html += '</div>';
+  });
+
+  // Total row
+  html += '</div>';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:8px 0;border-top:1px solid var(--border)">';
+  html += '<span style="font-size:13px;color:var(--text-2)">Total stock</span>';
+  html += '<span id="variantTotal" style="font-size:15px;font-weight:700;color:var(--accent)"></span>';
+  html += '</div>';
+
+  table.innerHTML = html;
+  table.querySelectorAll('.variant-qty').forEach(inp => inp.addEventListener('input', _updateTotal));
+  _updateTotal();
+}
+
+function _updateTotal() {
+  let total = 0;
+  document.querySelectorAll('.variant-qty').forEach(inp => { total += Math.max(parseInt(inp.value||0)||0, 0); });
+  const el = document.getElementById('variantTotal');
+  if (el) el.textContent = total;
+}
+
+const stagedImages = new DataTransfer();
+
+function syncImagesInput() {
+  const input = document.getElementById('imagesInput');
+  input.files = stagedImages.files;
+}
+
+function renderPendingImages() {
+  const wrap = document.getElementById('pendingImages');
+  const grid = document.getElementById('pendingImagesGrid');
+
+  if (!stagedImages.files.length) {
+    wrap.style.display = 'none';
+    grid.innerHTML = '';
+    return;
+  }
+
+  wrap.style.display = 'block';
+  grid.innerHTML = Array.from(stagedImages.files).map((file, index) => {
+    const src = URL.createObjectURL(file);
+    return `
+      <div style="position:relative;width:74px">
+        <img src="${src}" alt="${file.name}" style="width:74px;height:74px;object-fit:cover;border-radius:10px;border:1px solid var(--border);display:block">
+        <button type="button" onclick="removePendingImage(${index})" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border:none;border-radius:50%;background:var(--danger);color:#fff;font-size:14px;cursor:pointer;line-height:1">×</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function removePendingImage(index) {
+  const remaining = Array.from(stagedImages.files).filter((_, i) => i !== index);
+  const next = new DataTransfer();
+  remaining.forEach(file => next.items.add(file));
+  stagedImages.items.clear();
+  Array.from(next.files).forEach(file => stagedImages.items.add(file));
+  syncImagesInput();
+  renderPendingImages();
 }
 
 function toggleCreditSection(cb) {
@@ -212,15 +395,52 @@ function toggleNewSupplier(sel) {
   }
 }
 
-// On load: set label correctly
+// On load: set label correctly and initialise variant table
 (function() {
   const paid = document.getElementById('isPaidToggle');
   document.getElementById('supplierLabel').textContent = paid.checked ? 'Supplier' : 'Supplier *';
-  // Restore new supplier section if it was open (e.g. form re-render after error)
   const sel = document.getElementById('supplierSelect');
   if (sel.value === '__new__') {
     document.getElementById('newSupplierSection').style.display = 'block';
   }
+
+  const imagesInput = document.getElementById('imagesInput');
+  imagesInput.addEventListener('change', function() {
+    Array.from(this.files).forEach(file => stagedImages.items.add(file));
+    syncImagesInput();
+    renderPendingImages();
+  });
+
+  // Render variant table on load (handles edit mode where variants already exist)
+  renderVariantTable();
+
+  // Re-render when options text changes (debounced)
+  let _varDebounce;
+  ['size_options', 'color_options'].forEach(name => {
+    const el = document.querySelector(`[name="${name}"]`);
+    if (el) el.addEventListener('input', () => {
+      clearTimeout(_varDebounce);
+      _varDebounce = setTimeout(renderVariantTable, 350);
+    });
+  });
+
+  // On submit: serialise variant data
+  document.querySelector('form').addEventListener('submit', function() {
+    if (document.getElementById('variantFormActive').value === '1') {
+      const variants = [];
+      document.querySelectorAll('.variant-row').forEach(row => {
+        variants.push({
+          size: row.dataset.size,
+          color: row.dataset.color,
+          qty: Math.max(parseInt(row.querySelector('.variant-qty').value || 0) || 0, 0),
+        });
+      });
+      document.getElementById('variantsJsonInput').value = JSON.stringify(variants);
+      // Disable plain stock input so it doesn't override variant total
+      const sq = document.getElementById('stockQtyInput');
+      if (sq) sq.disabled = true;
+    }
+  });
 })();
 </script>
 {% if product and product.barcode %}

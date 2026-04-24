@@ -7,8 +7,9 @@ from django.http import JsonResponse, HttpResponse
 from django.utils.timezone import now
 from django.db import transaction
 from django.db.models import F, Q, Sum
+from core.access import require_store_permission
 from core.views import get_store
-from .models import Category, Product, ProductImage, Package, PackageItem, StockMovement, Supplier, SupplierTransaction
+from .models import Category, Product, ProductImage, ProductVariant, Package, PackageItem, StockMovement, Supplier, SupplierTransaction
 
 
 def _find_or_create_supplier(store, name, phone=''):
@@ -35,9 +36,10 @@ def _find_or_create_supplier(store, name, phone=''):
 @login_required
 def product_list(request, store_slug):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'view_inventory')
     q = request.GET.get('q', '')
     cat = request.GET.get('cat', '')
-    products = Product.objects.filter(store=store)
+    products = Product.objects.filter(store=store).prefetch_related('variants')
     if q:
         products = products.filter(Q(name__icontains=q) | Q(sku__icontains=q))
     if cat:
@@ -52,6 +54,7 @@ def product_list(request, store_slug):
 @login_required
 def product_form(request, store_slug, pk=None):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_inventory')
     product = get_object_or_404(Product, pk=pk, store=store) if pk else None
     store_categories = Category.objects.filter(store=store)
     suppliers = Supplier.objects.filter(store=store, is_active=True)
@@ -94,6 +97,8 @@ def product_form(request, store_slug, pk=None):
 
         # Supplier — required when stock is on credit
         sup_id = data.get('supplier', '').strip()
+        if sup_id == '__new__':
+            sup_id = ''
         new_sup_name = data.get('new_supplier_name', '').strip()
         new_sup_phone = data.get('new_supplier_phone', '').strip()
 
@@ -118,6 +123,11 @@ def product_form(request, store_slug, pk=None):
         product.available_for_preorder = data.get('available_for_preorder') == 'on'
         lead = data.get('preorder_lead_days', '').strip()
         product.preorder_lead_days = int(lead) if lead and lead.isdigit() else None
+        product.preorder_description = data.get('preorder_description', '').strip()
+        product.has_color_variants = data.get('has_color_variants') == 'on'
+        product.color_options = data.get('color_options', '').strip() if product.has_color_variants else ''
+        product.has_size_variants = data.get('has_size_variants') == 'on'
+        product.size_options = data.get('size_options', '').strip() if product.has_size_variants else ''
         product.save()
 
         if not product.sku:
@@ -138,6 +148,22 @@ def product_form(request, store_slug, pk=None):
                     date=_now().date(),
                 )
 
+        # Save variant stock when the variant form was active
+        if data.get('variant_form_active') == '1':
+            try:
+                variants_data = json.loads(data.get('variants_json', '[]'))
+            except (ValueError, TypeError):
+                variants_data = []
+            product.variants.all().delete()
+            total = 0
+            for vd in variants_data:
+                size = (vd.get('size') or '').strip()
+                color = (vd.get('color') or '').strip()
+                qty = max(int(vd.get('qty') or 0), 0)
+                ProductVariant.objects.create(product=product, size=size, color=color, stock_qty=qty)
+                total += qty
+            Product.objects.filter(pk=product.pk).update(stock_qty=total)
+
         for f in request.FILES.getlist('images'):
             ProductImage.objects.create(product=product, image=f)
 
@@ -147,17 +173,24 @@ def product_form(request, store_slug, pk=None):
     existing_names = set(store_categories.values_list('name', flat=True))
     standard_not_added = [c for c in STANDARD_RETAIL_CATEGORIES if c not in existing_names]
 
+    existing_variants_json = json.dumps({
+        f"{v.size}|{v.color}": v.stock_qty
+        for v in product.variants.all()
+    } if product else {})
+
     return render(request, 'inventory/product_form.html', {
         'store': store, 'product': product,
         'store_categories': store_categories,
         'standard_categories': standard_not_added,
         'suppliers': suppliers,
+        'existing_variants_json': existing_variants_json,
     })
 
 
 @login_required
 def stock_adjust(request, store_slug, pk):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_inventory')
     product = get_object_or_404(Product, pk=pk, store=store)
 
     if request.method == 'POST':
@@ -202,6 +235,7 @@ STANDARD_RETAIL_CATEGORIES = [
 @login_required
 def category_list(request, store_slug):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_inventory')
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         expiry_warning_days = int(request.POST.get('expiry_warning_days', 30) or 30)
@@ -227,6 +261,7 @@ def category_form(request, store_slug):
 @login_required
 def package_list(request, store_slug):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_inventory')
     packages = Package.objects.filter(store=store).prefetch_related('items__product')
     return render(request, 'inventory/package_list.html', {
         'store': store, 'packages': packages,
@@ -236,6 +271,7 @@ def package_list(request, store_slug):
 @login_required
 def package_form(request, store_slug, pk=None):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_inventory')
     package = get_object_or_404(Package, pk=pk, store=store) if pk else None
     products = Product.objects.filter(store=store, is_active=True)
 
@@ -270,6 +306,7 @@ def package_form(request, store_slug, pk=None):
 def stock_overview(request, store_slug):
     from django.utils import timezone
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'view_stock')
     products = Product.objects.filter(store=store, is_active=True).select_related('category').order_by('stock_qty')
     low = products.filter(stock_qty__lte=F('reorder_level'), stock_qty__gt=0)
     out = products.filter(stock_qty__lte=0)
@@ -292,6 +329,7 @@ def stock_overview(request, store_slug):
 @login_required
 def api_products(request, store_slug):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'view_inventory')
     q = request.GET.get('q', '')
     products = Product.objects.filter(store=store, is_active=True)
     if q:
@@ -309,6 +347,7 @@ def api_products(request, store_slug):
 @login_required
 def supplier_list(request, store_slug):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_suppliers')
     suppliers = Supplier.objects.filter(store=store)
     total_owed = suppliers.filter(ownership='external').aggregate(t=Sum('outstanding_balance'))['t'] or 0
     total_invested = suppliers.filter(ownership='store_owned').aggregate(t=Sum('outstanding_balance'))['t'] or 0
@@ -321,6 +360,7 @@ def supplier_list(request, store_slug):
 @login_required
 def supplier_form(request, store_slug, pk=None):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_suppliers')
     supplier = get_object_or_404(Supplier, pk=pk, store=store) if pk else None
 
     if request.method == 'POST':
@@ -346,6 +386,7 @@ def supplier_form(request, store_slug, pk=None):
 @login_required
 def supplier_detail(request, store_slug, pk):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_suppliers')
     supplier = get_object_or_404(Supplier, pk=pk, store=store)
     transactions = supplier.transactions.all()[:50]
     return render(request, 'inventory/supplier_detail.html', {
@@ -357,6 +398,7 @@ def supplier_detail(request, store_slug, pk):
 @login_required
 def supplier_transact(request, store_slug, pk):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_suppliers')
     supplier = get_object_or_404(Supplier, pk=pk, store=store)
 
     if request.method == 'POST':
@@ -375,6 +417,7 @@ def supplier_transact(request, store_slug, pk):
 @login_required
 def supplier_toggle(request, store_slug, pk):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_suppliers')
     supplier = get_object_or_404(Supplier, pk=pk, store=store)
     supplier.is_active = not supplier.is_active
     supplier.save(update_fields=['is_active'])
@@ -384,6 +427,7 @@ def supplier_toggle(request, store_slug, pk):
 @login_required
 def barcode_print(request, store_slug, pk):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'view_inventory')
     product = get_object_or_404(Product, pk=pk, store=store)
     qty = int(request.GET.get('qty', 1))
     return render(request, 'inventory/barcode_print.html', {
@@ -394,6 +438,7 @@ def barcode_print(request, store_slug, pk):
 @login_required
 def api_packages(request, store_slug):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'sell')
     packages = Package.objects.filter(store=store, is_active=True).prefetch_related('items__product')
     data = [{
         'id': str(p.id), 'name': p.name,
@@ -406,6 +451,7 @@ def api_packages(request, store_slug):
 @login_required
 def download_template(request, store_slug):
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_inventory')
     from .template_generator import generate_product_template
     wb = generate_product_template(store)
     buf = io.BytesIO()
@@ -421,24 +467,54 @@ def download_template(request, store_slug):
 
 @login_required
 def bulk_upload(request, store_slug):
+    import os
+    import re
+    import zipfile
+    import openpyxl
+    from django.core.files.base import ContentFile
+    from .sku import generate_sku
+
     store = get_store(store_slug, request.user)
+    require_store_permission(request.user, store, 'manage_inventory')
     results = None
 
     if request.method == 'POST' and request.FILES.get('file'):
-        import openpyxl
-        from .sku import generate_sku
-
         created, warnings, errors = [], [], []
+        images_saved = 0
 
+        # --- Extract images from ZIP (before transaction so failures are just warnings) ---
+        _ALLOWED_IMG_EXTS = {'.png', '.jpg', '.jpeg', '.webp', '.gif'}
+        zip_images = {}  # stem_lower → (original_basename, file_bytes)
+        if request.FILES.get('images_zip'):
+            try:
+                with zipfile.ZipFile(io.BytesIO(request.FILES['images_zip'].read())) as zf:
+                    for zname in zf.namelist():
+                        basename = os.path.basename(zname)
+                        if not basename or basename.startswith('.') or basename.startswith('__'):
+                            continue
+                        ext = os.path.splitext(basename)[1].lower()
+                        if ext not in _ALLOWED_IMG_EXTS:
+                            continue
+                        stem = os.path.splitext(basename)[0].lower()
+                        zip_images[stem] = (basename, zf.read(zname))
+                if not zip_images:
+                    warnings.append('ZIP contained no recognised image files (.png .jpg .jpeg .webp .gif).')
+            except zipfile.BadZipFile:
+                warnings.append('Images ZIP could not be read — images not imported.')
+            except Exception as zip_exc:
+                warnings.append(f'Images ZIP error: {zip_exc} — images not imported.')
+
+        # --- Load workbook ---
         try:
             wb = openpyxl.load_workbook(request.FILES['file'], data_only=True)
             ws = wb['Products'] if 'Products' in wb.sheetnames else wb.active
         except Exception as e:
-            errors.append(f"Could not read file: {e}")
-            results = {'created': [], 'warnings': [], 'errors': errors}
+            errors.append(f'Could not read file: {e}')
+            results = {'created': [], 'warnings': [], 'errors': errors, 'images_saved': 0}
             return render(request, 'inventory/bulk_upload.html', {'store': store, 'results': results})
 
         cat_map = {c.name.lower(): c for c in Category.objects.filter(store=store)}
+        product_image_queue = []  # [(product_obj, image_base_str)]
 
         try:
             with transaction.atomic():
@@ -450,12 +526,11 @@ def bulk_upload(request, store_slug):
                     unit_price_raw = row[3]
 
                     if not name:
-                        errors.append(f"Row {row_num}: Product name is required — skipped")
+                        errors.append(f'Row {row_num}: Product name is required — skipped')
                         continue
                     if unit_price_raw is None or str(unit_price_raw).strip() == '':
                         errors.append(f"Row {row_num}: Unit price is required for '{name}' — skipped")
                         continue
-
                     try:
                         unit_price = float(unit_price_raw)
                     except (ValueError, TypeError):
@@ -484,19 +559,23 @@ def bulk_upload(request, store_slug):
                     unit_label = str(row[5]).strip() if row[5] else 'unit'
                     supplier_name = str(row[6]).strip() if row[6] else ''
                     supplier_phone = str(row[7]).strip() if row[7] else ''
-
                     paid_val = str(row[8]).strip().upper() if row[8] else 'YES'
                     is_paid = paid_val != 'NO'
-
                     preorder_val = str(row[9]).strip().upper() if row[9] else 'NO'
                     available_for_preorder = preorder_val == 'YES'
-
                     try:
                         reorder_level = int(row[10]) if row[10] is not None else 5
                     except (ValueError, TypeError):
                         reorder_level = 5
 
-                    # Unpaid stock requires a supplier
+                    # New columns: size options (L), color options (M), image filename (N)
+                    size_opts_raw = str(row[11]).strip() if len(row) > 11 and row[11] else ''
+                    color_opts_raw = str(row[12]).strip() if len(row) > 12 and row[12] else ''
+                    image_base = ''
+                    if len(row) > 13 and row[13]:
+                        # Strip extension if user included it (e.g. "sneakers.png" → "sneakers")
+                        image_base = os.path.splitext(str(row[13]).strip())[0].strip()
+
                     if not is_paid and not supplier_name:
                         errors.append(f"Row {row_num}: '{name}' is marked unpaid — Supplier Name is required. Skipped.")
                         continue
@@ -517,9 +596,12 @@ def bulk_upload(request, store_slug):
                         reorder_level=reorder_level,
                         is_paid=is_paid,
                         available_for_preorder=available_for_preorder,
+                        has_size_variants=bool(size_opts_raw),
+                        size_options=size_opts_raw,
+                        has_color_variants=bool(color_opts_raw),
+                        color_options=color_opts_raw,
                     )
                     product.save()
-
                     product.sku = generate_sku(store, category, name)
                     product.save(update_fields=['sku'])
 
@@ -529,7 +611,6 @@ def bulk_upload(request, store_slug):
                             quantity=stock_qty, reason='Bulk upload',
                         )
 
-                    # Record supplier debt for unpaid stock
                     if not is_paid and supplier_obj:
                         cost_total = cost_price * max(stock_qty, 1)
                         if cost_total > 0:
@@ -543,10 +624,91 @@ def bulk_upload(request, store_slug):
                             )
 
                     created.append(name)
+                    if image_base:
+                        product_image_queue.append((product, image_base))
 
         except Exception as e:
-            errors.append(f"Upload failed: {e}")
+            errors.append(f'Upload failed: {e}')
+            product_image_queue.clear()  # products rolled back — nothing to attach images to
 
-        results = {'created': created, 'warnings': warnings, 'errors': errors}
+        # --- Process Variants sheet (outside main transaction, fail-safe) ---
+        if 'Variants' in wb.sheetnames and created:
+            ws_var = wb['Variants']
+            variant_product_ids = set()
+            for vrow_num, vrow in enumerate(ws_var.iter_rows(min_row=2, values_only=True), start=2):
+                if not any(vrow):
+                    continue
+                prod_name = str(vrow[0]).strip() if vrow[0] else ''
+                size = str(vrow[1]).strip() if len(vrow) > 1 and vrow[1] else ''
+                color = str(vrow[2]).strip() if len(vrow) > 2 and vrow[2] else ''
+                try:
+                    qty = max(int(vrow[3] or 0), 0) if len(vrow) > 3 else 0
+                except (TypeError, ValueError):
+                    qty = 0
+                if not prod_name:
+                    continue
+                try:
+                    prod_obj = Product.objects.get(store=store, name__iexact=prod_name, is_active=True)
+                except Product.DoesNotExist:
+                    warnings.append(f"Variants row {vrow_num}: '{prod_name}' not found in store — skipped")
+                    continue
+                except Product.MultipleObjectsReturned:
+                    prod_obj = Product.objects.filter(store=store, name__iexact=prod_name, is_active=True).first()
+
+                ProductVariant.objects.update_or_create(
+                    product=prod_obj, size=size, color=color,
+                    defaults={'stock_qty': qty},
+                )
+                # Mark product options if not already set
+                update_fields = []
+                if size and not prod_obj.has_size_variants:
+                    prod_obj.has_size_variants = True
+                    existing_sizes = set(prod_obj.size_option_list)
+                    existing_sizes.add(size)
+                    prod_obj.size_options = ', '.join(sorted(existing_sizes))
+                    update_fields += ['has_size_variants', 'size_options']
+                if color and not prod_obj.has_color_variants:
+                    prod_obj.has_color_variants = True
+                    existing_colors = set(prod_obj.color_option_list)
+                    existing_colors.add(color)
+                    prod_obj.color_options = ', '.join(sorted(existing_colors))
+                    update_fields += ['has_color_variants', 'color_options']
+                if update_fields:
+                    prod_obj.save(update_fields=update_fields)
+                variant_product_ids.add(prod_obj.pk)
+
+            # Sync each affected product's total stock_qty from its variants
+            for pid in variant_product_ids:
+                total = ProductVariant.objects.filter(product_id=pid).aggregate(t=Sum('stock_qty'))['t'] or 0
+                Product.objects.filter(pk=pid).update(stock_qty=total)
+
+        # --- Match and save images outside the transaction (fail-safe per product) ---
+        if product_image_queue and zip_images:
+            for product, img_base in product_image_queue:
+                base_lower = img_base.lower()
+                # Match exact base OR base followed by digits: productA, productA1, productA2, …
+                pattern = re.compile(r'^' + re.escape(base_lower) + r'\d*$')
+                matches = sorted(
+                    ((stem, fname, data) for stem, (fname, data) in zip_images.items() if pattern.match(stem)),
+                    key=lambda x: x[0],
+                )
+                if not matches:
+                    warnings.append(f"'{product.name}': no image matching '{img_base}' found in ZIP — skipped")
+                    continue
+                for sort_order, (_, orig_fname, img_bytes) in enumerate(matches):
+                    try:
+                        ext = os.path.splitext(orig_fname)[1] or '.jpg'
+                        pi = ProductImage(product=product, sort_order=sort_order)
+                        pi.image.save(f'{product.pk}_{sort_order}{ext}', ContentFile(img_bytes), save=True)
+                        images_saved += 1
+                    except Exception as img_err:
+                        warnings.append(f"Image '{orig_fname}' for '{product.name}': {img_err}")
+        elif product_image_queue and not zip_images:
+            warnings.append(
+                f'{len(product_image_queue)} product(s) have image filenames specified but no ZIP was uploaded — '
+                'upload an images ZIP to attach product photos.'
+            )
+
+        results = {'created': created, 'warnings': warnings, 'errors': errors, 'images_saved': images_saved}
 
     return render(request, 'inventory/bulk_upload.html', {'store': store, 'results': results})

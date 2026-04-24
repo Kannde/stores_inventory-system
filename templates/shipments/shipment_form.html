@@ -1,0 +1,355 @@
+{% extends 'base.html' %}
+{% block title %}{% if shipment %}Edit Shipment{% else %}New Shipment{% endif %} - {{ store.name }}{% endblock %}
+
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'shipments:shipment_list' store.slug %}" class="back">&larr;</a>
+  <h1>{% if shipment %}Edit Shipment{% else %}New Shipment{% endif %}</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.package-card { background:var(--surface-2); border-radius:var(--radius); padding:12px; margin-bottom:12px; }
+.package-item-row { border:1px solid var(--border); border-radius:12px; padding:10px; margin-top:8px; background:var(--surface); }
+.product-dropdown { display:none; position:absolute; z-index:200; background:var(--surface); border:1px solid var(--border); border-radius:8px; max-height:220px; overflow-y:auto; width:100%; top:calc(100% + 4px); left:0; box-shadow:0 4px 16px rgba(0,0,0,0.14); }
+.pd-opt { padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); font-size:13px; }
+.pd-opt:last-child { border-bottom:none; }
+.pd-opt:hover, .pd-opt:active { background:var(--surface-2); }
+.pd-new { color:var(--warning,#f59e0b); }
+.new-product-badge { display:none; font-size:11px; color:var(--warning,#f59e0b); margin-top:4px; padding:4px 8px; background:rgba(245,158,11,0.08); border-radius:6px; }
+</style>
+
+<div class="container" style="padding-bottom:120px">
+  <form method="post" enctype="multipart/form-data" id="shipmentForm">
+    {% csrf_token %}
+    <input type="hidden" name="packages_json" id="packagesJsonInput">
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px">Shipment Details</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label class="form-label">Tracking Number *</label>
+          <input type="text" name="tracking_number" class="form-input" required value="{{ shipment.tracking_number|default:'' }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Shipping Company *</label>
+          <input type="text" name="shipping_company" class="form-input" required value="{{ shipment.shipping_company|default:'' }}">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label class="form-label">Method</label>
+          <select name="method" class="form-select">
+            {% for value, label in method_choices %}
+            <option value="{{ value }}" {% if shipment.method == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select">
+            {% for value, label in status_choices %}
+            <option value="{{ value }}" {% if shipment.status == value or not shipment and value == 'WAREHOUSE' %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label class="form-label">Origin</label>
+          <input type="text" name="origin" class="form-input" value="{{ shipment.origin|default:'China' }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Destination</label>
+          <input type="text" name="destination" class="form-input" value="{{ shipment.destination|default:'Ghana' }}">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label class="form-label">Departure Date</label>
+          <input type="date" name="departure_date" class="form-input" value="{{ shipment.departure_date|date:'Y-m-d'|default:'' }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Estimated Arrival</label>
+          <input type="date" name="estimated_arrival" class="form-input" value="{{ shipment.estimated_arrival|date:'Y-m-d'|default:'' }}">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label class="form-label">Actual Arrival</label>
+          <input type="date" name="actual_arrival" class="form-input" value="{{ shipment.actual_arrival|date:'Y-m-d'|default:'' }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Waybill / Document</label>
+          <input type="file" name="document" class="form-input">
+          {% if shipment.document %}<div style="font-size:12px;color:var(--text-3);margin-top:4px">Current: <a href="{{ shipment.document.url }}" target="_blank">open document</a></div>{% endif %}
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Notes</label>
+        <textarea name="notes" class="form-textarea" rows="3">{{ shipment.notes|default:'' }}</textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="card-title">Packages</div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="addPackage()">+ Add Package</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-3);margin-bottom:12px">Each package can contain multiple products. New products not yet in your store will be created automatically.</div>
+      <div id="packagesContainer"></div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block">{% if shipment %}Save Changes{% else %}Create Shipment{% endif %}</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SUPPLIERS = {{ suppliers_json|safe }};
+const PRODUCTS = {{ products_json|safe }};
+const INITIAL_PACKAGES = {{ packages_json|safe }};
+const PRODUCT_BY_ID = Object.fromEntries(PRODUCTS.map(p => [p.id, p]));
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(s) {
+  return String(s||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function supplierOptions(selectedId) {
+  return '<option value="">— Optional supplier —</option>' +
+    SUPPLIERS.map(s => `<option value="${s.id}"${s.id===selectedId?' selected':''}>${esc(s.name)}</option>`).join('');
+}
+
+function variantField(type, options, selected) {
+  if (options && options.length) {
+    const opts = `<option value="">Any ${type}</option>` +
+      options.map(v => `<option value="${esc(v)}"${v===selected?' selected':''}>${esc(v)}</option>`).join('');
+    return `<select class="form-select item-${type}">${opts}</select>`;
+  }
+  return `<input type="text" class="form-input item-${type}" value="${escAttr(selected||'')}" placeholder="e.g. ${type==='size'?'S, M, L, XL':'Red, Blue'}">`;
+}
+
+function renderVariantSection(container, product, selSize, selColor) {
+  const sizes = product ? (product.sizes||[]) : [];
+  const colors = product ? (product.colors||[]) : [];
+  container.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px">
+      <div class="form-group">
+        <label class="form-label" style="font-size:11px;color:var(--text-3)">Size <span style="font-weight:400">(optional)</span></label>
+        ${variantField('size', sizes, selSize||'')}
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-size:11px;color:var(--text-3)">Color <span style="font-weight:400">(optional)</span></label>
+        ${variantField('color', colors, selColor||'')}
+      </div>
+    </div>`;
+}
+
+function buildDropdown(row, query) {
+  const dropdown = row.querySelector('.product-dropdown');
+  const q = (query||'').trim().toLowerCase();
+  const matches = q
+    ? PRODUCTS.filter(p => p.name.toLowerCase().includes(q) || (p.sku&&p.sku.toLowerCase().includes(q)))
+    : PRODUCTS.slice(0, 30);
+
+  let html = matches.slice(0,20).map(p =>
+    `<div class="pd-opt" data-id="${p.id}">${esc(p.name)}${p.sku?'<span style="color:var(--text-3);font-size:11px"> · '+esc(p.sku)+'</span>':''}</div>`
+  ).join('');
+
+  if (query.trim() && !PRODUCTS.find(p => p.name.toLowerCase()===query.trim().toLowerCase())) {
+    html += `<div class="pd-opt pd-new" data-new="${escAttr(query.trim())}">+ Add "<strong>${esc(query.trim())}</strong>" as new product</div>`;
+  }
+
+  if (!html) html = '<div style="padding:10px 12px;color:var(--text-3);font-size:13px">No products found</div>';
+  dropdown.innerHTML = html;
+
+  dropdown.querySelectorAll('.pd-opt').forEach(opt => {
+    opt.addEventListener('mousedown', e => {
+      e.preventDefault();
+      const pid = opt.dataset.id;
+      const newName = opt.dataset.new;
+      applyProductSelection(row, pid||'', newName||'');
+      dropdown.style.display = 'none';
+    });
+  });
+  dropdown.style.display = 'block';
+}
+
+function applyProductSelection(row, productId, newName) {
+  const hiddenId = row.querySelector('.item-product-id');
+  const searchInput = row.querySelector('.item-product-search');
+  const badge = row.querySelector('.new-product-badge');
+  const variantContainer = row.querySelector('.variant-container');
+
+  if (productId) {
+    const p = PRODUCT_BY_ID[productId];
+    hiddenId.value = productId;
+    searchInput.value = p.name;
+    badge.style.display = 'none';
+    renderVariantSection(variantContainer, p, '', '');
+  } else {
+    hiddenId.value = '';
+    if (newName) searchInput.value = newName;
+    badge.style.display = 'block';
+    renderVariantSection(variantContainer, null, '', '');
+  }
+}
+
+function addPackageItem(packageEl, data) {
+  data = data || {};
+  const row = document.createElement('div');
+  row.className = 'package-item-row';
+  row.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <div style="font-size:13px;font-weight:700">Expected Item</div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="this.closest('.package-item-row').remove()">Remove</button>
+    </div>
+    <div class="form-group" style="margin-top:10px">
+      <label class="form-label">Product *</label>
+      <div style="position:relative">
+        <input type="text" class="form-input item-product-search" placeholder="Search or type new product name…" autocomplete="off">
+        <input type="hidden" class="item-product-id">
+        <div class="product-dropdown"></div>
+        <div class="new-product-badge">⚠ New product — will be added to your store when saved</div>
+      </div>
+    </div>
+    <div class="variant-container"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px">
+      <div class="form-group">
+        <label class="form-label">Supplier</label>
+        <select class="form-select item-supplier">${supplierOptions(data.supplier_id||'')}</select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Expected Qty *</label>
+        <input type="number" min="1" class="form-input item-expected" value="${parseInt(data.expected_quantity)||1}">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">Notes</label>
+      <input type="text" class="form-input item-notes" value="${escAttr(data.notes||'')}">
+    </div>`;
+
+  packageEl.querySelector('.package-items').appendChild(row);
+
+  const searchInput = row.querySelector('.item-product-search');
+  const dropdown = row.querySelector('.product-dropdown');
+  const variantContainer = row.querySelector('.variant-container');
+
+  searchInput.addEventListener('focus', () => buildDropdown(row, searchInput.value));
+  searchInput.addEventListener('input', () => {
+    buildDropdown(row, searchInput.value);
+    // Clear selection if user edits after picking
+    row.querySelector('.item-product-id').value = '';
+    row.querySelector('.new-product-badge').style.display = 'none';
+  });
+  searchInput.addEventListener('blur', () => {
+    setTimeout(() => { dropdown.style.display = 'none'; }, 160);
+  });
+
+  // Restore from existing data
+  if (data.product_id && PRODUCT_BY_ID[data.product_id]) {
+    const p = PRODUCT_BY_ID[data.product_id];
+    searchInput.value = p.name;
+    row.querySelector('.item-product-id').value = p.id;
+    renderVariantSection(variantContainer, p, data.variant_size||'', data.variant_color||'');
+  } else if (data.new_product_name) {
+    searchInput.value = data.new_product_name;
+    row.querySelector('.new-product-badge').style.display = 'block';
+    renderVariantSection(variantContainer, null, data.variant_size||'', data.variant_color||'');
+  } else {
+    renderVariantSection(variantContainer, null, '', '');
+  }
+}
+
+function addPackage(data) {
+  data = data || { package_code:'', supplier_id:'', description:'', is_fragile:false, items:[] };
+  const wrapper = document.createElement('div');
+  wrapper.className = 'package-card';
+  wrapper.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <div style="font-size:14px;font-weight:700">Package</div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="this.closest('.package-card').remove()">Remove</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+      <div class="form-group">
+        <label class="form-label">Package Code *</label>
+        <input type="text" class="form-input package-code" value="${escAttr(data.package_code||'')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Supplier</label>
+        <select class="form-select package-supplier">${supplierOptions(data.supplier_id||'')}</select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <input type="text" class="form-input package-description" value="${escAttr(data.description||'')}">
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <input type="checkbox" class="package-fragile"${data.is_fragile?' checked':''}>
+      <span style="font-size:13px">Fragile package</span>
+    </label>
+    <div class="package-items"></div>
+    <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px" onclick="addPackageItem(this.closest('.package-card'))">+ Add Item</button>`;
+  document.getElementById('packagesContainer').appendChild(wrapper);
+  if (data.items && data.items.length) {
+    data.items.forEach(item => addPackageItem(wrapper, item));
+  } else {
+    addPackageItem(wrapper);
+  }
+}
+
+function collectPackages() {
+  return Array.from(document.querySelectorAll('.package-card')).map(card => ({
+    package_code: card.querySelector('.package-code').value.trim(),
+    supplier_id: card.querySelector('.package-supplier').value,
+    description: card.querySelector('.package-description').value.trim(),
+    is_fragile: card.querySelector('.package-fragile').checked,
+    items: Array.from(card.querySelectorAll('.package-item-row')).map(row => {
+      const productId = row.querySelector('.item-product-id').value.trim();
+      const searchVal = row.querySelector('.item-product-search').value.trim();
+      return {
+        product_id: productId,
+        new_product_name: productId ? '' : searchVal,
+        variant_size: (row.querySelector('.item-size')?.value||'').trim(),
+        variant_color: (row.querySelector('.item-color')?.value||'').trim(),
+        supplier_id: row.querySelector('.item-supplier').value,
+        expected_quantity: row.querySelector('.item-expected').value,
+        notes: row.querySelector('.item-notes').value.trim(),
+      };
+    }).filter(item => item.product_id || item.new_product_name)
+  })).filter(pkg => pkg.package_code);
+}
+
+document.getElementById('shipmentForm').addEventListener('submit', function(e) {
+  const packages = collectPackages();
+  if (!packages.length) {
+    e.preventDefault();
+    alert('Add at least one package before saving.');
+    return;
+  }
+  // Warn about new products but still allow save
+  const newItems = packages.flatMap(p => p.items.filter(i => !i.product_id && i.new_product_name));
+  if (newItems.length) {
+    const names = newItems.map(i => i.new_product_name).join(', ');
+    if (!confirm(`${newItems.length} new product(s) not yet in your store will be created:\n\n${names}\n\nThey will have 0 prices — update them on the product page or at the time of receiving.\n\nContinue?`)) {
+      e.preventDefault();
+      return;
+    }
+  }
+  document.getElementById('packagesJsonInput').value = JSON.stringify(packages);
+});
+
+if (INITIAL_PACKAGES.length) {
+  INITIAL_PACKAGES.forEach(addPackage);
+} else {
+  addPackage();
+}
+</script>
+{% endblock %}
+
+{% block bottomnav %}{% with nav='dashboard' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}

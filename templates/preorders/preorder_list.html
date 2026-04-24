@@ -2,14 +2,13 @@
 {% block title %}Pre-orders - {{ store.name }}{% endblock %}
 {% block topnav %}
 <div class="topnav">
-  <a href="{% url 'core:store_dashboard' store.slug %}" class="back">←</a>
+  <a href="{% url 'core:store_dashboard' store.slug %}" class="back"><-</a>
   <h1>Pre-orders</h1>
 </div>
 {% endblock %}
 {% block content %}
 <div class="container">
 
-  <!-- Share link card -->
   <div class="card" style="margin-bottom:14px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <div class="card-title">Customer Pre-order Link</div>
@@ -27,29 +26,60 @@
   </div>
 
   <div class="tabs">
-    <a href="?status=pending" class="tab {% if current_status == 'pending' %}active{% endif %}">Pending</a>
-    <a href="?status=confirmed" class="tab {% if current_status == 'confirmed' %}active{% endif %}">Confirmed</a>
-    <a href="?status=ready" class="tab {% if current_status == 'ready' %}active{% endif %}">Ready</a>
-    <a href="?status=fulfilled" class="tab {% if current_status == 'fulfilled' %}active{% endif %}">Fulfilled</a>
-    <a href="?status=all" class="tab {% if current_status == 'all' %}active{% endif %}">All</a>
+    <a href="?status=pending{% if q %}&q={{ q|urlencode }}{% endif %}" class="tab {% if current_status == 'pending' %}active{% endif %}">Pending</a>
+    <a href="?status=confirmed{% if q %}&q={{ q|urlencode }}{% endif %}" class="tab {% if current_status == 'confirmed' %}active{% endif %}">Confirmed</a>
+    <a href="?status=ready{% if q %}&q={{ q|urlencode }}{% endif %}" class="tab {% if current_status == 'ready' %}active{% endif %}">Ready</a>
+    <a href="?status=fulfilled{% if q %}&q={{ q|urlencode }}{% endif %}" class="tab {% if current_status == 'fulfilled' %}active{% endif %}">Fulfilled</a>
+    <a href="?status=all{% if q %}&q={{ q|urlencode }}{% endif %}" class="tab {% if current_status == 'all' %}active{% endif %}">All</a>
   </div>
 
+  <form method="get" class="search-bar" style="margin-bottom:12px">
+    <input type="hidden" name="status" value="{{ current_status }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="search" name="q" placeholder="Search customer, phone, or pickup code..." value="{{ q }}">
+  </form>
+
   {% for po in preorders %}
-  <a href="{% url 'preorders:preorder_detail' store.slug po.pk %}" class="card" style="display:block;text-decoration:none;color:inherit">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start">
-      <div>
-        <div style="font-weight:600;font-size:15px">{{ po.customer_name }}</div>
-        <div style="font-size:12px;color:var(--text-3)">{{ po.customer_phone }} · {{ po.created_at|date:"d M, H:i" }}</div>
-        <div style="font-size:13px;color:var(--text-2);margin-top:4px">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+      <div style="min-width:0">
+        <div style="font-weight:700;font-size:15px">{{ po.customer_name }}</div>
+        <div style="font-size:12px;color:var(--text-3);margin-top:2px">{{ po.customer_phone }} | {{ po.created_at|date:"d M, H:i" }}</div>
+        <div style="font-size:13px;color:var(--text-2);margin-top:6px">
           {{ po.items.count }} item{{ po.items.count|pluralize }}
-          {% if po.desired_date %} · Need by {{ po.desired_date|date:"d M" }}{% endif %}
+          {% if po.desired_date %} | Need by {{ po.desired_date|date:"d M" }}{% endif %}
         </div>
+        {% if po.pickup_code %}
+        <div style="margin-top:8px">
+          <span style="display:inline-flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;color:var(--accent)">
+            Pickup code: {{ po.pickup_code }}
+          </span>
+        </div>
+        {% endif %}
       </div>
       <span class="badge {% if po.status == 'pending' %}badge-warning{% elif po.status == 'confirmed' %}badge-info{% elif po.status == 'ready' %}badge-success{% elif po.status == 'fulfilled' %}badge-success{% else %}badge-danger{% endif %}">
         {{ po.get_status_display }}
       </span>
     </div>
-  </a>
+
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <a href="{% url 'preorders:preorder_detail' store.slug po.pk %}" class="btn btn-outline btn-sm" style="flex:1;min-width:140px">Open Details</a>
+      {% if po.pickup_code_is_active and po.customer_whatsapp %}
+      <a href="https://wa.me/{{ po.customer_whatsapp }}?text=Hello%20{{ po.customer_name|urlencode }}%2C%20your%20preorder%20from%20{{ store.name|urlencode }}%20is%20ready%20for%20pickup.%20Your%20pickup%20code%20is%20{{ po.pickup_code|urlencode }}." target="_blank" class="btn btn-outline btn-sm" style="flex:1;min-width:140px;color:#25d366">Send Code</a>
+      {% endif %}
+      {% if po.pickup_code_is_active %}
+      <form method="post" action="{% url 'preorders:preorder_status' store.slug po.pk %}" style="flex:1;min-width:140px">
+        {% csrf_token %}
+        <input type="hidden" name="status" value="fulfilled">
+        <input type="hidden" name="staff_notes" value="{{ po.staff_notes }}">
+        <input type="hidden" name="return_to" value="list">
+        <input type="hidden" name="return_status" value="{{ current_status }}">
+        <input type="hidden" name="return_q" value="{{ q }}">
+        <button type="submit" class="btn btn-primary btn-sm" style="width:100%">Mark Fulfilled</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
   {% empty %}
   <div class="empty"><p>No pre-orders found</p></div>
   {% endfor %}
@@ -61,9 +91,12 @@
 function copyLink() {
   const url = document.getElementById('shareUrl').textContent.trim();
   navigator.clipboard.writeText(url).then(() => alert('Link copied!')).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = url; document.body.appendChild(ta); ta.select();
-    document.execCommand('copy'); document.body.removeChild(ta);
+    const textarea = document.createElement('textarea');
+    textarea.value = url;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
     alert('Link copied!');
   });
 }

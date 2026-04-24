@@ -9,30 +9,157 @@
 <style>
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  margin-bottom: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
 }
-@media (min-width: 480px) { .product-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 560px) {
+  .product-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
 .product-card {
   background: var(--surface);
-  border: 1.5px solid var(--border);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
   cursor: pointer;
-  transition: border-color .15s, transform .1s;
-  position: relative;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
 }
-.product-card:active { transform: scale(.97); }
-.product-card.selected { border-color: var(--accent); }
-.product-card.out-of-stock { opacity: .45; pointer-events: none; }
-.product-img { width: 100%; aspect-ratio: 1/1; object-fit: cover; display: block; background: var(--surface-2); }
-.product-img-placeholder { width: 100%; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; background: var(--accent-light); font-size: 28px; font-weight: 700; color: var(--accent); }
-.product-info { padding: 8px 10px 10px; }
-.product-name { font-size: 13px; font-weight: 600; line-height: 1.3; margin-bottom: 4px; }
-.product-price { font-size: 14px; font-weight: 700; color: var(--accent); }
-.product-stock { font-size: 11px; color: var(--text-3); }
-.qty-badge { position: absolute; top: 6px; right: 6px; background: var(--accent); color: #fff; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+.product-media {
+  position: relative;
+  background: linear-gradient(180deg, #f6f8fb 0%, #e8eef7 100%);
+}
+.product-img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+}
+.product-img-placeholder {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.gallery-count,
+.qty-badge {
+  position: absolute;
+  top: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.gallery-count {
+  left: 10px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+}
+.qty-badge {
+  right: 10px;
+  min-width: 28px;
+  text-align: center;
+  background: var(--accent);
+  color: #fff;
+}
+.product-info {
+  padding: 10px 12px 12px;
+}
+.product-name {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-bottom: 4px;
+}
+.product-price {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.product-description {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 34px;
+}
+.product-meta {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.gallery-main {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+.gallery-main-placeholder {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f6f8fb 0%, #e8eef7 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.gallery-thumbs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin-top: 10px;
+  padding-bottom: 2px;
+}
+.gallery-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  object-fit: cover;
+  cursor: pointer;
+  background: var(--surface-2);
+}
+.gallery-thumb.active {
+  border-color: var(--accent);
+}
+.option-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+.qty-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.qty-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 20px;
+}
+.qty-value {
+  min-width: 32px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+}
 </style>
 
 <div class="container" style="padding-bottom:200px">
@@ -52,11 +179,10 @@
   {% if store_settings.preorder_expected_days %}
   <div style="font-size:13px;color:var(--text-3);text-align:center;margin-bottom:14px">
     Expected fulfillment: {{ store_settings.preorder_expected_days }} day{{ store_settings.preorder_expected_days|pluralize }}
-    {% if store_settings.preorder_payment_policy == 'upfront' %} · Full payment upfront required{% elif store_settings.preorder_payment_policy == 'deposit' %} · {{ store_settings.preorder_deposit_percent|floatformat:0 }}% deposit required{% endif %}
+    {% if store_settings.preorder_payment_policy == 'upfront' %} | Full payment upfront required{% elif store_settings.preorder_payment_policy == 'deposit' %} | {{ store_settings.preorder_deposit_percent|floatformat:0 }}% deposit required{% endif %}
   </div>
   {% endif %}
 
-  <!-- Product catalog -->
   <div class="search-bar" style="margin-bottom:12px">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
     <input type="search" id="searchInput" placeholder="Search products..." autocomplete="off" style="padding-left:40px">
@@ -70,11 +196,8 @@
   {% else %}
   <div class="product-grid" id="productGrid"></div>
   <div id="noResults" class="empty" style="display:none;padding:24px 0"><p>No matching products</p></div>
-  <!-- Lead time toast -->
-  <div id="leadToast" style="display:none;position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1b4332;color:#fff;padding:10px 20px;border-radius:24px;font-size:13px;font-weight:600;z-index:200;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.2)"></div>
   {% endif %}
 
-  <!-- Cart summary -->
   <div id="cartSection" style="display:none">
     <div class="card">
       <div class="card-header">
@@ -85,7 +208,6 @@
     </div>
   </div>
 
-  <!-- Sticky checkout -->
   <div id="checkoutBar" style="display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:12px 16px calc(12px + env(safe-area-inset-bottom,0));z-index:95;box-shadow:0 -2px 10px rgba(0,0,0,.08)">
     <div style="max-width:600px;margin:0 auto">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -97,7 +219,13 @@
   </div>
 </div>
 
-<!-- Order Details Modal -->
+<div class="modal-overlay" id="productModal">
+  <div class="modal-sheet" style="max-height:92vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div id="productModalContent"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="orderModal">
   <div class="modal-sheet" style="max-height:90vh;overflow-y:auto">
     <div class="modal-handle"></div>
@@ -121,6 +249,10 @@
         <input type="tel" name="customer_whatsapp" class="form-input" placeholder="If different from phone" inputmode="tel">
       </div>
       <div class="form-group">
+        <label class="form-label">Email Address</label>
+        <input type="email" name="customer_email" class="form-input" placeholder="Optional">
+      </div>
+      <div class="form-group">
         <label class="form-label">City / Town *</label>
         <input type="text" name="customer_city" class="form-input" required placeholder="Your city or town">
       </div>
@@ -134,7 +266,7 @@
       </div>
 
       <div style="display:flex;gap:8px;margin-top:8px;padding-bottom:8px">
-        <button type="button" class="btn btn-outline" style="flex:1" onclick="document.getElementById('orderModal').classList.remove('open')">Back</button>
+        <button type="button" class="btn btn-outline" style="flex:1" onclick="closeModal('orderModal')">Back</button>
         <button type="submit" class="btn btn-primary" style="flex:2">Submit Order</button>
       </div>
     </form>
@@ -144,145 +276,326 @@
 
 {% block scripts %}
 <script>
-const STORE_SLUG = '{{ store.slug }}';
 const CURRENCY = '{{ store.currency_symbol }}';
 const ALL_PRODUCTS = {{ products_json|safe }};
-let cart = [];
+const DEFAULT_LEAD = {{ store_settings.preorder_expected_days|default:0 }};
 
-function escAttr(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+let cart = [];
+let activeProduct = null;
+let activeGalleryIndex = 0;
+let productModalQty = 1;
+let productModalSelection = { color: '', size: '' };
+
+function escHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
-function renderCatalog(q) {
-  q = (q || '').toLowerCase().trim();
-  const products = q ? ALL_PRODUCTS.filter(p => p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q))) : ALL_PRODUCTS;
+function cartKey(item) {
+  return [item.id, item.selected_color || '', item.selected_size || ''].join('::');
+}
+
+function getProductTotalQty(productId) {
+  return cart.filter(item => item.id === productId).reduce((sum, item) => sum + item.quantity, 0);
+}
+
+function truncateText(text, length) {
+  const value = String(text || '').trim();
+  if (!value) return '';
+  return value.length > length ? value.slice(0, length - 1) + '...' : value;
+}
+
+function renderCatalog(query) {
+  const search = String(query || '').toLowerCase().trim();
+  const products = search
+    ? ALL_PRODUCTS.filter(product =>
+        product.name.toLowerCase().includes(search) ||
+        (product.sku && product.sku.toLowerCase().includes(search)) ||
+        (product.description && product.description.toLowerCase().includes(search))
+      )
+    : ALL_PRODUCTS;
+
   const grid = document.getElementById('productGrid');
   const noResults = document.getElementById('noResults');
+  if (!grid) return;
 
-  if (!products.length) { grid.innerHTML = ''; noResults.style.display = 'block'; return; }
+  if (!products.length) {
+    grid.innerHTML = '';
+    noResults.style.display = 'block';
+    return;
+  }
+
   noResults.style.display = 'none';
+  grid.innerHTML = products.map(product => {
+    const totalQty = getProductTotalQty(product.id);
+    const media = product.image_url
+      ? `<img src="${escHtml(product.image_url)}" class="product-img" loading="lazy" alt="${escHtml(product.name)}">`
+      : `<div class="product-img-placeholder">${escHtml(product.name.charAt(0).toUpperCase())}</div>`;
+    const stockText = product.stock_qty > 0
+      ? `${product.stock_qty} ${escHtml(product.unit_label)} in stock now`
+      : 'Available for preorder';
 
-  grid.innerHTML = products.map(p => {
-    const outOfStock = p.stock_qty <= 0;
-    const cartItem = cart.find(i => i.id === p.id);
-    const qty = cartItem ? cartItem.quantity : 0;
-    const imgHtml = p.image_url
-      ? `<img src="${escAttr(p.image_url)}" class="product-img" loading="lazy">`
-      : `<div class="product-img-placeholder">${escAttr(p.name.charAt(0).toUpperCase())}</div>`;
-    return `<div class="product-card${outOfStock ? ' out-of-stock' : ''}${qty > 0 ? ' selected' : ''}" onclick='toggleProduct(${JSON.stringify(p)})'>
-      ${imgHtml}
-      ${qty > 0 ? `<div class="qty-badge">${qty}</div>` : ''}
-      <div class="product-info">
-        <div class="product-name">${escAttr(p.name)}</div>
-        <div class="product-price">${CURRENCY}${parseFloat(p.unit_price).toFixed(2)}</div>
-        <div class="product-stock">${outOfStock ? 'Unavailable' : p.stock_qty + ' ' + escAttr(p.unit_label) + ' available'}</div>
-      </div>
-    </div>`;
+    return `
+      <button type="button" class="product-card" onclick="openProductModal('${product.id}')">
+        <div class="product-media">
+          ${media}
+          ${product.image_urls && product.image_urls.length > 1 ? `<div class="gallery-count">${product.image_urls.length} photos</div>` : ''}
+          ${totalQty > 0 ? `<div class="qty-badge">${totalQty}</div>` : ''}
+        </div>
+        <div class="product-info">
+          <div class="product-name">${escHtml(product.name)}</div>
+          <div class="product-price">${CURRENCY}${parseFloat(product.unit_price).toFixed(2)}</div>
+          <div class="product-description">${escHtml(truncateText(product.description, 110) || 'Tap to view product details, photos, and preorder options.')}</div>
+          <div class="product-meta">${stockText}</div>
+        </div>
+      </button>
+    `;
   }).join('');
 }
 
-let toastTimer = null;
-const DEFAULT_LEAD = {{ store_settings.preorder_expected_days|default:0 }};
-
-function showLeadToast(leadDays) {
-  const days = leadDays || DEFAULT_LEAD;
-  if (!days) return;
-  const toast = document.getElementById('leadToast');
-  toast.textContent = '⏱ Expected wait: ' + days + ' day' + (days > 1 ? 's' : '');
-  toast.style.display = 'block';
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toast.style.display = 'none'; }, 3000);
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
 }
 
-function toggleProduct(p) {
-  const existing = cart.find(i => i.id === p.id);
-  if (existing) {
-    existing.quantity++;
-  } else {
-    cart.push({ id: p.id, name: p.name, unit_price: parseFloat(p.unit_price), quantity: 1, unit_label: p.unit_label, lead_days: p.lead_days, type: 'product' });
+function openProductModal(productId) {
+  activeProduct = ALL_PRODUCTS.find(product => product.id === productId) || null;
+  if (!activeProduct) return;
+  activeGalleryIndex = 0;
+  productModalQty = 1;
+  productModalSelection = { color: '', size: '' };
+  renderProductModal();
+  document.getElementById('productModal').classList.add('open');
+}
+
+function setGalleryImage(index) {
+  rememberModalSelections();
+  activeGalleryIndex = index;
+  renderProductModal();
+}
+
+function changeModalQty(delta) {
+  productModalQty = Math.max(1, productModalQty + delta);
+  document.getElementById('productModalQtyValue').textContent = productModalQty;
+}
+
+function rememberModalSelections() {
+  productModalSelection.color = document.getElementById('modalColorSelect')?.value || '';
+  productModalSelection.size = document.getElementById('modalSizeSelect')?.value || '';
+}
+
+function renderProductModal() {
+  if (!activeProduct) return;
+
+  const imageUrls = activeProduct.image_urls || [];
+  const currentImage = imageUrls[activeGalleryIndex] || '';
+  const gallery = currentImage
+    ? `<img src="${escHtml(currentImage)}" class="gallery-main" alt="${escHtml(activeProduct.name)}">`
+    : `<div class="gallery-main-placeholder">${escHtml(activeProduct.name.charAt(0).toUpperCase())}</div>`;
+  const thumbs = imageUrls.length > 1
+    ? `<div class="gallery-thumbs">${imageUrls.map((url, index) => `
+        <img src="${escHtml(url)}" alt="${escHtml(activeProduct.name)} photo ${index + 1}" class="gallery-thumb${index === activeGalleryIndex ? ' active' : ''}" onclick="setGalleryImage(${index})">
+      `).join('')}</div>`
+    : '';
+  const stockText = activeProduct.stock_qty > 0
+    ? `${activeProduct.stock_qty} ${escHtml(activeProduct.unit_label)} currently in stock`
+    : 'Currently prepared on preorder request';
+  const leadText = activeProduct.lead_days || DEFAULT_LEAD
+    ? `Expected wait: about ${activeProduct.lead_days || DEFAULT_LEAD} day${(activeProduct.lead_days || DEFAULT_LEAD) > 1 ? 's' : ''}`
+    : 'Expected wait time will be confirmed by the store.';
+  const colorOptions = (activeProduct.color_options || []).map(option => `<option value="${escHtml(option)}"${option === productModalSelection.color ? ' selected' : ''}>${escHtml(option)}</option>`).join('');
+  const sizeOptions = (activeProduct.size_options || []).map(option => `<option value="${escHtml(option)}"${option === productModalSelection.size ? ' selected' : ''}>${escHtml(option)}</option>`).join('');
+
+  document.getElementById('productModalContent').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px">
+      <div>
+        <h2 style="font-size:20px;font-weight:700;line-height:1.3;margin:0">${escHtml(activeProduct.name)}</h2>
+        <div style="font-size:15px;font-weight:700;color:var(--accent);margin-top:6px">${CURRENCY}${parseFloat(activeProduct.unit_price).toFixed(2)} / ${escHtml(activeProduct.unit_label)}</div>
+      </div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('productModal')">Close</button>
+    </div>
+    ${gallery}
+    ${thumbs}
+    <div style="font-size:14px;line-height:1.6;color:var(--text-2);margin-top:14px">${escHtml(activeProduct.description || 'No extra description has been added for this item yet.')}</div>
+    <div style="display:grid;gap:6px;margin-top:12px;font-size:12px;color:var(--text-3)">
+      <div>${stockText}</div>
+      <div>${leadText}</div>
+      ${activeProduct.sku ? `<div>SKU: ${escHtml(activeProduct.sku)}</div>` : ''}
+    </div>
+    <div class="option-grid">
+      ${(activeProduct.color_options || []).length ? `
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Choose Color *</label>
+          <select id="modalColorSelect" class="form-select" onchange="rememberModalSelections()">
+            <option value="">Select color</option>
+            ${colorOptions}
+          </select>
+        </div>
+      ` : ''}
+      ${(activeProduct.size_options || []).length ? `
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Choose Size *</label>
+          <select id="modalSizeSelect" class="form-select" onchange="rememberModalSelections()">
+            <option value="">Select size</option>
+            ${sizeOptions}
+          </select>
+        </div>
+      ` : ''}
+      <div>
+        <div class="form-label" style="margin-bottom:8px">Quantity</div>
+        <div class="qty-row">
+          <button type="button" class="qty-btn" onclick="changeModalQty(-1)">-</button>
+          <div class="qty-value" id="productModalQtyValue">${productModalQty}</div>
+          <button type="button" class="qty-btn" onclick="changeModalQty(1)">+</button>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="btn btn-primary btn-block" style="margin-top:16px" onclick="addCurrentProductToCart()">Add to Order</button>
+  `;
+}
+
+function addCurrentProductToCart() {
+  if (!activeProduct) return;
+
+  rememberModalSelections();
+  const selectedColor = productModalSelection.color;
+  const selectedSize = productModalSelection.size;
+
+  if ((activeProduct.color_options || []).length && !selectedColor) {
+    alert('Please choose a color for this item.');
+    return;
   }
-  showLeadToast(p.lead_days);
+  if ((activeProduct.size_options || []).length && !selectedSize) {
+    alert('Please choose a size for this item.');
+    return;
+  }
+
+  const cartItem = {
+    id: activeProduct.id,
+    name: activeProduct.name,
+    unit_price: parseFloat(activeProduct.unit_price),
+    quantity: productModalQty,
+    unit_label: activeProduct.unit_label,
+    lead_days: activeProduct.lead_days,
+    selected_color: selectedColor,
+    selected_size: selectedSize,
+  };
+
+  const existing = cart.find(item => cartKey(item) === cartKey(cartItem));
+  if (existing) {
+    existing.quantity += cartItem.quantity;
+  } else {
+    cart.push(cartItem);
+  }
+
+  closeModal('productModal');
   renderCatalog(document.getElementById('searchInput').value);
   renderCart();
 }
 
-function updateQty(idx, delta) {
-  cart[idx].quantity += delta;
-  if (cart[idx].quantity <= 0) cart.splice(idx, 1);
+function updateQty(index, delta) {
+  cart[index].quantity += delta;
+  if (cart[index].quantity <= 0) {
+    cart.splice(index, 1);
+  }
   renderCatalog(document.getElementById('searchInput').value);
   renderCart();
 }
 
-function getTotal() { return cart.reduce((s, i) => s + i.unit_price * i.quantity, 0); }
+function getTotal() {
+  return cart.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+}
 
 function renderCart() {
   const section = document.getElementById('cartSection');
   const bar = document.getElementById('checkoutBar');
   const container = document.getElementById('cartItems');
 
-  if (!cart.length) { section.style.display = 'none'; bar.style.display = 'none'; return; }
-  section.style.display = 'block'; bar.style.display = 'block';
+  if (!cart.length) {
+    section.style.display = 'none';
+    bar.style.display = 'none';
+    return;
+  }
 
-  document.getElementById('cartCount').textContent = cart.length + ' item' + (cart.length > 1 ? 's' : '');
+  section.style.display = 'block';
+  bar.style.display = 'block';
+  document.getElementById('cartCount').textContent = cart.length + ' line item' + (cart.length > 1 ? 's' : '');
 
-  container.innerHTML = cart.map((item, i) => `
-    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:500">${escAttr(item.name)}</div>
-        <div style="font-size:12px;color:var(--text-3)">${CURRENCY}${item.unit_price.toFixed(2)} / ${escAttr(item.unit_label)}</div>
-        ${(item.lead_days || DEFAULT_LEAD) ? `<div style="font-size:11px;color:var(--accent);margin-top:2px">⏱ ~${item.lead_days || DEFAULT_LEAD} day${(item.lead_days||DEFAULT_LEAD)>1?'s':''} wait</div>` : ''}
+  container.innerHTML = cart.map((item, index) => {
+    const variation = [item.selected_color, item.selected_size].filter(Boolean).join(' | ');
+    const leadDays = item.lead_days || DEFAULT_LEAD;
+    return `
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600">${escHtml(item.name)}</div>
+          ${variation ? `<div style="font-size:12px;color:var(--text-2);margin-top:2px">${escHtml(variation)}</div>` : ''}
+          <div style="font-size:12px;color:var(--text-3);margin-top:2px">${CURRENCY}${item.unit_price.toFixed(2)} / ${escHtml(item.unit_label)}</div>
+          ${leadDays ? `<div style="font-size:11px;color:var(--accent);margin-top:3px">Expected wait: about ${leadDays} day${leadDays > 1 ? 's' : ''}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button type="button" onclick="updateQty(${index}, -1)" style="width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:16px;cursor:pointer">-</button>
+          <span style="min-width:20px;text-align:center;font-weight:600">${item.quantity}</span>
+          <button type="button" onclick="updateQty(${index}, 1)" style="width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:16px;cursor:pointer">+</button>
+        </div>
+        <div style="font-weight:700;min-width:72px;text-align:right">${CURRENCY}${(item.unit_price * item.quantity).toFixed(2)}</div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <button type="button" onclick="updateQty(${i},-1)" style="width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:16px;cursor:pointer">−</button>
-        <span style="min-width:20px;text-align:center;font-weight:600">${item.quantity}</span>
-        <button type="button" onclick="updateQty(${i},1)" style="width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:16px;cursor:pointer">+</button>
-      </div>
-      <div style="font-weight:600;min-width:60px;text-align:right">${CURRENCY}${(item.unit_price*item.quantity).toFixed(2)}</div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 
-  const total = getTotal();
-  document.getElementById('totalAmount').textContent = CURRENCY + total.toFixed(2);
+  document.getElementById('totalAmount').textContent = CURRENCY + getTotal().toFixed(2);
 }
 
 function openOrderForm() {
-  const total = getTotal();
-  document.getElementById('orderSummaryText').textContent =
-    cart.length + ' item(s) — Total: ' + CURRENCY + total.toFixed(2);
   document.getElementById('itemsJsonInput').value = JSON.stringify(cart);
+  document.getElementById('orderSummaryText').textContent =
+    cart.length + ' line item' + (cart.length > 1 ? 's' : '') + ' | Total: ' + CURRENCY + getTotal().toFixed(2);
   document.getElementById('orderModal').classList.add('open');
 }
 
-document.getElementById('searchInput').addEventListener('input', function() { renderCatalog(this.value); });
-document.querySelectorAll('.modal-overlay').forEach(el => {
-  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
-});
-
 function getCsrfToken() {
-  return document.cookie.split(';').map(c => c.trim())
-    .find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
+  return document.cookie.split(';').map(item => item.trim())
+    .find(item => item.startsWith('csrftoken='))?.split('=')[1] || '';
 }
 
-async function handleOrderSubmit(e) {
-  if (navigator.onLine) return true; // let normal form submit happen
-  e.preventDefault();
+async function handleOrderSubmit(event) {
+  if (navigator.onLine) return true;
+  event.preventDefault();
 
   const form = document.getElementById('orderForm');
   const data = {};
-  new FormData(form).forEach((v, k) => { data[k] = v; });
+  new FormData(form).forEach((value, key) => {
+    data[key] = value;
+  });
   const csrfToken = getCsrfToken();
 
   await window.queuePreorder(form.action || window.location.href, data, csrfToken);
 
-  // Show success message
-  document.getElementById('orderModal').classList.remove('open');
+  closeModal('orderModal');
   cart = [];
   renderCatalog('');
   renderCart();
-  if (window.showPwaToast) showPwaToast('Pre-order saved — will sync when online', 'success');
-  else alert('Pre-order saved offline — will sync when reconnected.');
+  if (window.showPwaToast) {
+    window.showPwaToast('Pre-order saved and will sync when back online.', 'success');
+  } else {
+    alert('Pre-order saved offline and will sync when reconnected.');
+  }
   return false;
 }
+
+document.getElementById('searchInput')?.addEventListener('input', function() {
+  renderCatalog(this.value);
+});
+
+document.querySelectorAll('.modal-overlay').forEach(modal => {
+  modal.addEventListener('click', event => {
+    if (event.target === modal) {
+      modal.classList.remove('open');
+    }
+  });
+});
 
 renderCatalog('');
 </script>

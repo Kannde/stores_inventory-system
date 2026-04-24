@@ -121,6 +121,17 @@
       </div>
     </div>
 
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px">Manager Permissions</div>
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 0;cursor:pointer">
+        <input type="checkbox" name="manager_can_manage_shipments" {% if store_settings.manager_can_manage_shipments %}checked{% endif %} style="width:18px;height:18px;accent-color:var(--accent)">
+        <div>
+          <div style="font-weight:600;font-size:14px">Allow Store Managers to Manage Shipments</div>
+          <div style="font-size:12px;color:var(--text-3)">If enabled, manager accounts can create, edit, and receive shipments.</div>
+        </div>
+      </label>
+    </div>
+
     <button type="submit" class="btn btn-primary btn-block" style="margin-bottom:24px">Save Settings</button>
   </form>
 </div>

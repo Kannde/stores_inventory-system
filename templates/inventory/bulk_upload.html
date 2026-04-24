@@ -24,22 +24,41 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Download Template (.xlsx)
     </a>
-    <div style="margin-top:12px;font-size:12px;color:var(--text-3)">
-      <strong>Columns:</strong> Product Name, Category, Quantity, Unit Price, Cost Price, Unit Label, Supplier, Paid, Preorder, Reorder Level
+    <div style="margin-top:14px;font-size:12px;color:var(--text-3);line-height:1.7">
+      <strong>Required:</strong> Product Name, Unit Price<br>
+      <strong>Optional:</strong> Category, Quantity, Cost Price, Unit Label, Supplier Name, Supplier Phone, Paid, Preorder, Reorder Level<br>
+      <strong>Variants:</strong> Size Options (e.g. <em>S, M, L, XL</em>), Color Options (e.g. <em>Red, Blue</em>)<br>
+      <strong>Images:</strong> Image Filename — enter the base name without extension (e.g. <em>sneakers_red</em>). Upload a ZIP of images alongside.
     </div>
   </div>
 
   <!-- Step 2: Upload -->
   <div class="card">
-    <div class="card-header"><span class="card-title">Step 2 — Upload Filled Sheet</span></div>
-    <form method="post" enctype="multipart/form-data">
+    <div class="card-header"><span class="card-title">Step 2 — Upload</span></div>
+    <form method="post" enctype="multipart/form-data" id="uploadForm">
       {% csrf_token %}
+
       <div class="form-group">
-        <label class="form-label">Select Excel file (.xlsx)</label>
-        <input type="file" name="file" accept=".xlsx,.xls" class="form-input" required>
+        <label class="form-label">Products spreadsheet (.xlsx) *</label>
+        <input type="file" name="file" accept=".xlsx,.xls" class="form-input" required id="fileInput">
       </div>
-      <button type="submit" class="btn btn-primary btn-block" style="height:48px;font-size:16px">
-        Upload & Import Products
+
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">
+          Product images ZIP
+          <span style="font-size:11px;font-weight:400;color:var(--text-3)">(optional — only needed if you filled the Image Filename column)</span>
+        </label>
+        <input type="file" name="images_zip" accept=".zip" class="form-input" id="zipInput">
+        <div id="zipHint" style="display:none;margin-top:6px;font-size:12px;color:var(--text-3)">
+          Put all images in the ZIP. Name them to match the Image Filename column.<br>
+          Multiple images per product: <em>sneakers_red.png</em>, <em>sneakers_red1.png</em>, <em>sneakers_red2.png</em>
+        </div>
+      </div>
+
+      <div id="uploadSummary" style="display:none;margin-top:12px;padding:10px 12px;background:var(--surface-2);border-radius:8px;font-size:13px;color:var(--text-2)"></div>
+
+      <button type="submit" class="btn btn-primary btn-block" style="height:48px;font-size:16px;margin-top:14px">
+        Upload &amp; Import Products
       </button>
     </form>
   </div>
@@ -50,10 +69,15 @@
     <div class="card-header"><span class="card-title">Upload Results</span></div>
 
     {% if results.created %}
-    <div style="background:var(--accent-light);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px">
-      <div style="font-size:14px;font-weight:600;color:var(--accent-dark);margin-bottom:6px">
+    <div style="background:var(--accent-light,#d8f3dc);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px">
+      <div style="font-size:14px;font-weight:600;color:var(--accent-dark,#1b4332);margin-bottom:4px">
         ✓ {{ results.created|length }} product{{ results.created|length|pluralize }} created
       </div>
+      {% if results.images_saved %}
+      <div style="font-size:13px;color:var(--accent-dark,#1b4332);margin-bottom:4px">
+        🖼 {{ results.images_saved }} image{{ results.images_saved|pluralize }} attached
+      </div>
+      {% endif %}
       <a href="{% url 'inventory:product_list' store.slug %}" style="font-size:13px;color:var(--accent);font-weight:600">
         View products →
       </a>
@@ -61,18 +85,18 @@
     {% endif %}
 
     {% if results.warnings %}
-    <div style="background:var(--warning-light);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px">
-      <div style="font-size:13px;font-weight:600;color:var(--warning);margin-bottom:6px">
+    <div style="background:var(--warning-light,#fff3cd);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px">
+      <div style="font-size:13px;font-weight:600;color:var(--warning,#856404);margin-bottom:6px">
         ⚠ {{ results.warnings|length }} warning{{ results.warnings|length|pluralize }}
       </div>
       {% for w in results.warnings %}
-      <div style="font-size:12px;color:var(--warning);margin-top:4px">{{ w }}</div>
+      <div style="font-size:12px;color:var(--warning,#856404);margin-top:4px">{{ w }}</div>
       {% endfor %}
     </div>
     {% endif %}
 
     {% if results.errors %}
-    <div style="background:var(--danger-light);border-radius:var(--radius-sm);padding:12px">
+    <div style="background:var(--danger-light,#f8d7da);border-radius:var(--radius-sm);padding:12px">
       <div style="font-size:13px;font-weight:600;color:var(--danger);margin-bottom:6px">
         ✗ {{ results.errors|length }} error{{ results.errors|length|pluralize }}
       </div>
@@ -89,6 +113,32 @@
   {% endif %}
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const zipInput = document.getElementById('zipInput');
+const fileInput = document.getElementById('fileInput');
+const zipHint = document.getElementById('zipHint');
+const summary = document.getElementById('uploadSummary');
+
+zipInput.addEventListener('change', () => {
+  zipHint.style.display = zipInput.files.length ? 'block' : 'none';
+  updateSummary();
+});
+fileInput.addEventListener('change', updateSummary);
+
+function updateSummary() {
+  const hasFile = fileInput.files.length > 0;
+  const hasZip = zipInput.files.length > 0;
+  if (!hasFile && !hasZip) { summary.style.display = 'none'; return; }
+  const parts = [];
+  if (hasFile) parts.push(`📄 ${fileInput.files[0].name}`);
+  if (hasZip) parts.push(`🗜 ${zipInput.files[0].name}`);
+  summary.textContent = parts.join('   ·   ');
+  summary.style.display = 'block';
+}
+</script>
 {% endblock %}
 
 {% block bottomnav %}{% with nav='products' %}{% include 'includes/bottomnav.html' %}{% endwith %}{% endblock %}
