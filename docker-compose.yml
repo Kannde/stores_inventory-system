@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:16-alpine
+    hostname: stores-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-stores_inventory_system}
@@ -13,6 +14,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - default
+      - app_default
 
   web:
     build: .
@@ -32,13 +36,20 @@ services:
       DB_NAME: ${POSTGRES_DB:-stores_inventory_system}
       DB_USER: ${POSTGRES_USER:-stores_inventory}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-stores_inventory}
-      DB_HOST: db
+      DB_HOST: stores-db
       DB_PORT: 5432
     volumes:
       - media_files:/app/media
       - static_files:/app/staticfiles
+    networks:
+      - default
+      - app_default
 
 volumes:
   postgres_data:
   media_files:
   static_files:
+
+networks:
+  app_default:
+    external: true
