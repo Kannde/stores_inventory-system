@@ -499,3 +499,8 @@ def service_worker(request):
 
 def offline_view(request):
     return render(request, 'offline.html')
+
+
+def ping(request):
+    return HttpResponse('ok', content_type='text/plain',
+                        headers={'Cache-Control': 'no-store, no-cache, must-revalidate'})

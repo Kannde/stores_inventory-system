@@ -35,10 +35,31 @@
     <span id="onlineStatus">Back online! Reloading...</span>
   </div>
   <script>
-    window.addEventListener('online', () => {
-      document.getElementById('onlineStatus').style.display = 'block';
-      setTimeout(() => window.location.href = '/', 1500);
-    });
+    async function checkServer() {
+      try {
+        const r = await fetch('/ping/', { method: 'HEAD', cache: 'no-store' });
+        return r.ok;
+      } catch {
+        return false;
+      }
+    }
+
+    async function tryRecover() {
+      if (await checkServer()) {
+        document.getElementById('onlineStatus').style.display = 'block';
+        setTimeout(() => window.location.href = '/', 800);
+        return true;
+      }
+      return false;
+    }
+
+    // Poll every 3 seconds — catches cases where navigator.onLine is wrong
+    const poll = setInterval(async () => {
+      if (await tryRecover()) clearInterval(poll);
+    }, 3000);
+
+    // Also respond to the browser's online event
+    window.addEventListener('online', () => tryRecover());
   </script>
 </body>
 </html>

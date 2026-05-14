@@ -12,7 +12,7 @@ const PRE_CACHE_URLS = [
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(PRE_CACHE_URLS))
+      .then(cache => cache.addAll(PRE_CACHE_URLS).catch(() => {}))
       .then(() => self.skipWaiting())
   );
 });
@@ -35,8 +35,11 @@ self.addEventListener('fetch', event => {
 
   if (request.method !== 'GET') return;
   if (!url.protocol.startsWith('http')) return;
-  // Skip admin
+  // Skip admin and ping — these must always hit the real server
   if (url.pathname.startsWith('/admin/')) return;
+  if (url.pathname === '/ping/') return;
+  // Skip cross-origin requests
+  if (url.origin !== self.location.origin) return;
 
   // Static & media assets — Cache First
   if (url.pathname.startsWith('/static/') || url.pathname.startsWith('/media/')) {
@@ -109,14 +112,20 @@ async function networkFirst(request) {
 }
 
 async function networkFirstHTML(request) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
   try {
-    const response = await fetch(request);
-    if (response.ok) {
+    const response = await fetch(request, { signal: controller.signal });
+    clearTimeout(timer);
+    // Only cache same-origin, non-redirected responses (avoids caching login page under dashboard URL)
+    if (response.ok && response.url.startsWith(self.location.origin) &&
+        new URL(response.url).pathname === new URL(request.url).pathname) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, response.clone());
     }
     return response;
   } catch {
+    clearTimeout(timer);
     const cached = await caches.match(request);
     if (cached) return cached;
     return caches.match(OFFLINE_URL);

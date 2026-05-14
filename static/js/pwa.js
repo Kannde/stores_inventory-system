@@ -12,10 +12,21 @@ if ('serviceWorker' in navigator) {
 }
 
 // ── Offline / Online Indicator ────────────────────────────
-function updateOnlineStatus() {
+async function pingServer() {
+  try {
+    const r = await fetch('/ping/', { method: 'HEAD', cache: 'no-store' });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function updateOnlineStatus() {
   const bar = document.getElementById('offlineBar');
   if (!bar) return;
-  if (!navigator.onLine) {
+  // Use a real server ping — navigator.onLine is unreliable on some networks
+  const online = await pingServer();
+  if (!online) {
     bar.style.display = 'flex';
   } else {
     bar.style.display = 'none';
