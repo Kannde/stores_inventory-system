@@ -160,9 +160,10 @@
         <button type="button" class="pay-method btn btn-outline" data-method="card" onclick="selectPay(this)">Card</button>
         {% if allow_partial %}<button type="button" class="pay-method btn btn-outline" data-method="mixed" onclick="selectPay(this)">Part Payment</button>{% endif %}
         {% if allow_credit %}<button type="button" class="pay-method btn btn-outline" data-method="credit" onclick="selectPay(this)">Credit</button>{% endif %}
+        {% if skroda_enabled %}<button type="button" class="pay-method btn btn-outline" data-method="escrow" onclick="selectPay(this)" style="grid-column:1/-1;border-color:#fd6407;color:#fd6407">&#128737; Pay with Escrow (Skroda)</button>{% endif %}
       </div>
     </div>
-    <!-- Customer info — shown for credit/part payments -->
+    <!-- Customer info — shown for credit/part payments and escrow -->
     <div id="customerFields" style="display:none">
       <div class="form-group">
         <label class="form-label">Customer Name *</label>
@@ -380,20 +381,27 @@ function selectPay(el) {
   document.querySelectorAll('.pay-method').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
   payMethod = el.dataset.method;
-  const needsCustomer = payMethod === 'credit' || payMethod === 'mixed';
+  const needsCustomer = payMethod === 'credit' || payMethod === 'mixed' || payMethod === 'escrow';
   document.getElementById('customerFields').style.display = needsCustomer ? 'block' : 'none';
+  const amountGroup = document.getElementById('amountPaidGroup');
   const label = document.getElementById('amountPaidLabel');
-  if (payMethod === 'credit') {
-    label.textContent = 'Deposit Amount ({{ store.currency_symbol }})';
-    const total = getTotal();
-    document.getElementById('amountPaid').value = (total * MIN_DEPOSIT / 100).toFixed(2);
-    updateChange();
-  } else if (payMethod === 'mixed') {
-    label.textContent = 'Amount Paid Now ({{ store.currency_symbol }})';
+  if (payMethod === 'escrow') {
+    amountGroup.style.display = 'none';
+    document.getElementById('changeDisplay').style.display = 'none';
   } else {
-    label.textContent = 'Amount Received';
-    document.getElementById('amountPaid').value = getTotal().toFixed(2);
-    updateChange();
+    amountGroup.style.display = 'block';
+    if (payMethod === 'credit') {
+      label.textContent = 'Deposit Amount ({{ store.currency_symbol }})';
+      const total = getTotal();
+      document.getElementById('amountPaid').value = (total * MIN_DEPOSIT / 100).toFixed(2);
+      updateChange();
+    } else if (payMethod === 'mixed') {
+      label.textContent = 'Amount Paid Now ({{ store.currency_symbol }})';
+    } else {
+      label.textContent = 'Amount Received';
+      document.getElementById('amountPaid').value = getTotal().toFixed(2);
+      updateChange();
+    }
   }
 }
 
@@ -425,11 +433,11 @@ function getCsrfToken() {
 }
 
 async function completeSale() {
-  const needsCustomer = payMethod === 'credit' || payMethod === 'mixed';
+  const needsCustomer = payMethod === 'credit' || payMethod === 'mixed' || payMethod === 'escrow';
   if (needsCustomer) {
     const name = document.getElementById('customerName').value.trim();
     const phone = document.getElementById('customerPhone').value.trim();
-    if (!name || !phone) { alert('Customer name and phone are required for credit/part payments.'); return; }
+    if (!name || !phone) { alert('Customer name and phone are required for credit/part/escrow payments.'); return; }
   }
   const btn = document.getElementById('confirmBtn');
   btn.disabled = true; btn.textContent = 'Processing...';
@@ -468,6 +476,11 @@ async function completeSale() {
     });
     const data = await res.json();
     if (data.success) {
+      if (data.escrow && data.checkout_url) {
+        // Escrow payment: redirect buyer to Skroda hosted checkout
+        window.location.href = data.checkout_url;
+        return;
+      }
       closeCheckout();
       document.getElementById('receiptNumber').textContent = data.receipt_number;
       document.getElementById('receiptTotal').textContent = CURRENCY + parseFloat(data.total).toFixed(2);

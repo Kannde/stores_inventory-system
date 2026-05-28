@@ -17,5 +17,6 @@ urlpatterns = [
     path('s/<slug:store_slug>/expenses/', include('expenses.urls')),
     path('s/<slug:store_slug>/procurement/', include('procurement.urls')),
     path('s/<slug:store_slug>/shipments/', include('shipments.urls')),
+    path('s/<slug:store_slug>/payments/', include('payments.urls')),
     path('media/<path:path>', serve, {'document_root': settings.MEDIA_ROOT}),
 ]

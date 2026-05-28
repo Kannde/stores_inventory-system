@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block title %}Payment Received — {{ store.name }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'core:store_dashboard' store.slug %}" class="back">&larr;</a>
+  <h1>{{ store.name }}</h1>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container" style="padding-top:32px;text-align:center">
+  <div style="width:72px;height:72px;border-radius:50%;background:var(--accent-light);display:flex;align-items:center;justify-content:center;margin:0 auto 20px">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+  </div>
+  <h1 style="font-size:22px;font-weight:700;margin-bottom:8px">Payment Received</h1>
+  <p style="font-size:14px;color:var(--text-2);margin-bottom:4px">
+    Your payment has been placed in escrow by <strong>Skroda</strong>.
+  </p>
+  <p style="font-size:13px;color:var(--text-3);margin-bottom:24px">
+    Funds will be released to the seller once you confirm delivery.
+  </p>
+
+  <div class="card" style="text-align:left">
+    <div class="card-title" style="margin-bottom:8px">Order Summary</div>
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="color:var(--text-2)">Receipt</span>
+      <span style="font-weight:600">{{ sale.receipt_number }}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="color:var(--text-2)">Total</span>
+      <span style="font-weight:700;color:var(--accent)">{{ store.currency_symbol }}{{ sale.total_amount }}</span>
+    </div>
+    {% if skroda_txn %}
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="color:var(--text-2)">Skroda Reference</span>
+      <span style="font-weight:600;font-size:13px">{{ skroda_txn.reference_code }}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:8px 0">
+      <span style="color:var(--text-2)">Escrow Status</span>
+      <span style="font-weight:600;color:var(--accent)">{{ skroda_txn.get_status_display }}</span>
+    </div>
+    {% endif %}
+  </div>
+
+  <a href="{% url 'sales:sale_receipt' store.slug sale.id %}" class="btn btn-primary btn-block" style="margin-top:16px">View Receipt</a>
+  <a href="{% url 'core:store_dashboard' store.slug %}" class="btn btn-outline btn-block" style="margin-top:10px">Back to Dashboard</a>
+</div>
+{% endblock %}

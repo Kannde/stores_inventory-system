@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}Payment Cancelled — {{ store.name }}{% endblock %}
+{% block topnav %}
+<div class="topnav">
+  <a href="{% url 'core:store_dashboard' store.slug %}" class="back">&larr;</a>
+  <h1>{{ store.name }}</h1>
+</div>
+{% endblock %}
+{% block content %}
+<div class="container" style="padding-top:32px;text-align:center">
+  <div style="width:72px;height:72px;border-radius:50%;background:var(--danger-light,#fee2e2);display:flex;align-items:center;justify-content:center;margin:0 auto 20px">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </div>
+  <h1 style="font-size:22px;font-weight:700;margin-bottom:8px">Payment Cancelled</h1>
+  <p style="font-size:14px;color:var(--text-2);margin-bottom:24px">
+    Your escrow payment was cancelled. No money was charged.<br>
+    <span style="font-size:13px;color:var(--text-3)">Receipt: {{ sale.receipt_number }}</span>
+  </p>
+
+  <a href="{% url 'sales:new_sale' store.slug %}" class="btn btn-primary btn-block">Try Again</a>
+  <a href="{% url 'core:store_dashboard' store.slug %}" class="btn btn-outline btn-block" style="margin-top:10px">Back to Dashboard</a>
+</div>
+{% endblock %}

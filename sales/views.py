@@ -64,6 +64,7 @@ def new_sale(request, store_slug):
         'allow_partial': store_settings.allow_partial_payment,
         'allow_credit': store_settings.allow_credit,
         'min_deposit_percent': store_settings.min_deposit_percent,
+        'skroda_enabled': store_settings.skroda_enabled,
     })
 
 
@@ -104,11 +105,17 @@ def api_checkout(request, store_slug):
     customer_name = data.get('customer_name', '')
     customer_phone = data.get('customer_phone', '')
 
+    store_settings, _ = StoreSettings.objects.get_or_create(store=store)
+
+    # Escrow payments start as pending_payment; stock is held but sale not yet finalised
+    initial_status = 'pending_payment' if payment_method == 'escrow' else 'completed'
+
     with transaction.atomic():
         sale = Sale(
             store=store,
             payment_method=payment_method,
-            amount_paid=amount_paid,
+            status=initial_status,
+            amount_paid=0 if payment_method == 'escrow' else amount_paid,
             customer_name=customer_name,
             customer_phone=customer_phone,
             notes=data.get('notes', ''),
@@ -121,6 +128,7 @@ def api_checkout(request, store_slug):
         sale.save()
 
         total = 0
+        item_names = []
         for item in items:
             item_type = item.get('type', 'product')
             qty = int(item.get('quantity', 1))
@@ -133,7 +141,6 @@ def api_checkout(request, store_slug):
                 product = get_object_or_404(Product, pk=item['id'], store=store)
                 unit_price = float(item.get('unit_price', product.unit_price))
                 item_name = product.name
-                # Deduct stock
                 product.stock_qty = max(0, product.stock_qty - qty)
                 product.save(update_fields=['stock_qty'])
                 StockMovement.objects.create(
@@ -144,7 +151,6 @@ def api_checkout(request, store_slug):
                 package = get_object_or_404(Package, pk=item['id'], store=store)
                 unit_price = float(item.get('unit_price', package.package_price))
                 item_name = package.name
-                # Deduct stock for each item in package
                 for pi in package.items.select_related('product').all():
                     prod = pi.product
                     deduct = pi.quantity * qty
@@ -157,6 +163,7 @@ def api_checkout(request, store_slug):
 
             line_total = qty * unit_price
             total += line_total
+            item_names.append(item_name)
 
             SaleItem.objects.create(
                 sale=sale,
@@ -169,7 +176,7 @@ def api_checkout(request, store_slug):
             )
 
         sale.total_amount = total
-        sale.change_given = max(0, float(amount_paid) - total)
+        sale.change_given = 0 if payment_method == 'escrow' else max(0, float(amount_paid) - total)
         sale.save(update_fields=['total_amount', 'change_given'])
 
         if payment_method in ('credit', 'mixed') and customer_name:
@@ -181,6 +188,78 @@ def api_checkout(request, store_slug):
                 total_amount=total,
                 amount_paid=float(amount_paid),
             )
+
+    # Skroda escrow: create transaction and redirect buyer to hosted checkout
+    if payment_method == 'escrow':
+        if not store_settings.skroda_enabled or not store_settings.skroda_secret_key:
+            sale.status = 'refunded'
+            sale.save(update_fields=['status'])
+            return JsonResponse({'error': 'Escrow payments are not configured for this store.'}, status=400)
+
+        from payments.service import create_transaction, create_checkout_session
+        from payments.models import SkrodaTransaction
+
+        title = ', '.join(item_names[:3]) + (' & more' if len(item_names) > 3 else '')
+        currency = store.currency_symbol if store.currency_symbol in ('GHS', 'USD', 'NGN') else 'GHS'
+        seller_phone = store_settings.skroda_seller_phone or store.phone
+
+        if not seller_phone:
+            sale.status = 'refunded'
+            sale.save(update_fields=['status'])
+            return JsonResponse({'error': 'Skroda seller phone not configured. Set it in Store Settings → Skroda Escrow Payments.'}, status=400)
+
+        ok, txn_data = create_transaction(
+            store_settings.skroda_secret_key,
+            title=title,
+            amount=total,
+            currency=currency,
+            seller_phone=seller_phone,
+            seller_name=store.name,
+            buyer_phone=customer_phone or None,
+            buyer_name=customer_name or None,
+            partner_reference=str(sale.id),
+            fee_paid_by=store_settings.skroda_fee_paid_by,
+        )
+        if not ok:
+            sale.status = 'refunded'
+            sale.save(update_fields=['status'])
+            return JsonResponse({'error': txn_data.get('error', 'Failed to create escrow transaction.')}, status=502)
+
+        success_url = request.build_absolute_uri(
+            f'/s/{store.slug}/payments/skroda/{sale.id}/success/'
+        )
+        cancel_url = request.build_absolute_uri(
+            f'/s/{store.slug}/payments/skroda/{sale.id}/cancelled/'
+        )
+
+        ok2, session_data = create_checkout_session(
+            store_settings.skroda_secret_key,
+            transaction_id=txn_data['id'],
+            success_url=success_url,
+            cancel_url=cancel_url,
+        )
+
+        checkout_url = session_data.get('checkout_url', txn_data.get('checkout_url', ''))
+
+        SkrodaTransaction.objects.create(
+            sale=sale,
+            store=store,
+            skroda_id=txn_data['id'],
+            reference_code=txn_data.get('reference_code', ''),
+            status=txn_data.get('status', 'draft'),
+            amount=total,
+            checkout_url=checkout_url,
+            invite_link=txn_data.get('invite_link', ''),
+        )
+
+        return JsonResponse({
+            'success': True,
+            'escrow': True,
+            'sale_id': str(sale.id),
+            'receipt_number': sale.receipt_number,
+            'total': str(sale.total_amount),
+            'checkout_url': checkout_url,
+        })
 
     return JsonResponse({
         'success': True,

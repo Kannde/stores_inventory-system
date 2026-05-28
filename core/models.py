@@ -63,6 +63,17 @@ class StoreSettings(models.Model):
     preorder_all_products = models.BooleanField(default=True, help_text='Show all active products in preorder catalog')
     manager_can_manage_shipments = models.BooleanField(default=False, help_text='Allow store managers to access shipment management')
 
+    # Skroda escrow payment integration
+    skroda_enabled = models.BooleanField(default=False, help_text='Enable Skroda escrow payments at checkout')
+    skroda_secret_key = models.CharField(max_length=200, blank=True, help_text='Skroda secret API key (sk_live_... or sk_test_...)')
+    skroda_webhook_secret = models.CharField(max_length=200, blank=True, help_text='Skroda webhook signing secret')
+    skroda_seller_phone = models.CharField(max_length=30, blank=True, help_text='Phone number the store owner registered on Skroda (e.g. 0241234567)')
+    skroda_fee_paid_by = models.CharField(
+        max_length=10,
+        choices=[('buyer', 'Buyer pays fee'), ('seller', 'Seller pays fee')],
+        default='buyer',
+    )
+
     def __str__(self):
         return f"Settings for {self.store.name}"
 

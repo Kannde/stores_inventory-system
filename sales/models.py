@@ -7,6 +7,7 @@ from inventory.models import Product, Package
 
 class Sale(models.Model):
     STATUS_CHOICES = [
+        ('pending_payment', 'Pending Payment'),
         ('completed', 'Completed'),
         ('refunded', 'Refunded'),
         ('partial_refund', 'Partial Refund'),
@@ -17,6 +18,7 @@ class Sale(models.Model):
         ('card', 'Card'),
         ('credit', 'Credit'),
         ('mixed', 'Mixed'),
+        ('escrow', 'Escrow (Skroda)'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

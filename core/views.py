@@ -414,6 +414,16 @@ def store_settings(request, store_slug):
         settings_obj.preorder_whatsapp_number = request.POST.get('preorder_whatsapp_number', '')
         settings_obj.preorder_all_products = request.POST.get('preorder_all_products') == 'on'
         settings_obj.manager_can_manage_shipments = request.POST.get('manager_can_manage_shipments') == 'on'
+        settings_obj.skroda_enabled = request.POST.get('skroda_enabled') == 'on'
+        settings_obj.skroda_seller_phone = request.POST.get('skroda_seller_phone', '').strip()
+        settings_obj.skroda_fee_paid_by = request.POST.get('skroda_fee_paid_by', 'buyer')
+        # Only overwrite keys if a non-empty value was submitted (prevents clearing on save)
+        new_secret_key = request.POST.get('skroda_secret_key', '').strip()
+        new_webhook_secret = request.POST.get('skroda_webhook_secret', '').strip()
+        if new_secret_key:
+            settings_obj.skroda_secret_key = new_secret_key
+        if new_webhook_secret:
+            settings_obj.skroda_webhook_secret = new_webhook_secret
         settings_obj.save()
         messages.success(request, 'Store settings updated.')
         return redirect('core:store_settings', store_slug=store.slug)

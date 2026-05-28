@@ -122,6 +122,50 @@
     </div>
 
     <div class="card">
+      <div class="card-title" style="margin-bottom:4px">Skroda Escrow Payments</div>
+      <div style="font-size:12px;color:var(--text-3);margin-bottom:12px">
+        Let customers pay via Skroda escrow. Funds are held safely until delivery is confirmed.
+        Get your API keys at <strong>skroda.com/partner</strong>.
+      </div>
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer">
+        <input type="checkbox" name="skroda_enabled" {% if store_settings.skroda_enabled %}checked{% endif %} style="width:18px;height:18px;accent-color:var(--accent)">
+        <div>
+          <div style="font-weight:600;font-size:14px">Enable Escrow Payments</div>
+          <div style="font-size:12px;color:var(--text-3)">Shows "Pay with Escrow" option at checkout</div>
+        </div>
+      </label>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Your Skroda Phone Number *</label>
+        <input type="tel" name="skroda_seller_phone" class="form-input"
+          value="{{ store_settings.skroda_seller_phone }}" placeholder="e.g. 0241234567">
+        <div style="font-size:11px;color:var(--text-3);margin-top:3px">
+          The phone number you registered with on <strong>skroda.com</strong>. Skroda uses this to identify you as the seller and disburse funds to you.
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Secret API Key</label>
+        <input type="password" name="skroda_secret_key" class="form-input" autocomplete="new-password"
+          placeholder="{% if store_settings.skroda_secret_key %}Key saved — leave blank to keep current{% else %}sk_live_... or sk_test_...{% endif %}">
+        <div style="font-size:11px;color:var(--text-3);margin-top:3px">Server-side secret key. Leave blank to keep existing value.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Webhook Secret</label>
+        <input type="password" name="skroda_webhook_secret" class="form-input" autocomplete="new-password"
+          placeholder="{% if store_settings.skroda_webhook_secret %}Secret saved — leave blank to keep current{% else %}Your Skroda webhook signing secret{% endif %}">
+        <div style="font-size:11px;color:var(--text-3);margin-top:3px">
+          Webhook URL: <code>{{ request.scheme }}://{{ request.get_host }}/s/{{ store.slug }}/payments/skroda/webhook/</code>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Skroda Fee Paid By</label>
+        <select name="skroda_fee_paid_by" class="form-select">
+          <option value="buyer" {% if store_settings.skroda_fee_paid_by == 'buyer' %}selected{% endif %}>Buyer pays Skroda fee</option>
+          <option value="seller" {% if store_settings.skroda_fee_paid_by == 'seller' %}selected{% endif %}>Seller pays Skroda fee</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="card-title" style="margin-bottom:12px">Manager Permissions</div>
       <label style="display:flex;align-items:center;gap:10px;padding:10px 0;cursor:pointer">
         <input type="checkbox" name="manager_can_manage_shipments" {% if store_settings.manager_can_manage_shipments %}checked{% endif %} style="width:18px;height:18px;accent-color:var(--accent)">
