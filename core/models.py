@@ -73,6 +73,15 @@ class StoreSettings(models.Model):
         choices=[('buyer', 'Buyer pays fee'), ('seller', 'Seller pays fee')],
         default='buyer',
     )
+    skroda_delivery_mode = models.CharField(
+        max_length=20,
+        choices=[
+            ('agent_preferred', 'Agent preferred (use agent if available, fall back to direct)'),
+            ('agent_required', 'Agent required (hold transaction if no agent in buyer\'s city)'),
+            ('direct_only', 'Direct only (seller ships directly, no agent)'),
+        ],
+        default='agent_preferred',
+    )
 
     def __str__(self):
         return f"Settings for {self.store.name}"

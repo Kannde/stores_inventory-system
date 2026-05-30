@@ -219,6 +219,7 @@ def api_checkout(request, store_slug):
             buyer_name=customer_name or None,
             partner_reference=str(sale.id),
             fee_paid_by=store_settings.skroda_fee_paid_by,
+            delivery_mode=store_settings.skroda_delivery_mode,
         )
         if not ok:
             sale.status = 'refunded'
@@ -247,6 +248,7 @@ def api_checkout(request, store_slug):
             skroda_id=txn_data['id'],
             reference_code=txn_data.get('reference_code', ''),
             status=txn_data.get('status', 'draft'),
+            delivery_mode=txn_data.get('delivery_mode', store_settings.skroda_delivery_mode),
             amount=total,
             checkout_url=checkout_url,
             invite_link=txn_data.get('invite_link', ''),

@@ -417,6 +417,7 @@ def store_settings(request, store_slug):
         settings_obj.skroda_enabled = request.POST.get('skroda_enabled') == 'on'
         settings_obj.skroda_seller_phone = request.POST.get('skroda_seller_phone', '').strip()
         settings_obj.skroda_fee_paid_by = request.POST.get('skroda_fee_paid_by', 'buyer')
+        settings_obj.skroda_delivery_mode = request.POST.get('skroda_delivery_mode', 'agent_preferred')
         # Only overwrite keys if a non-empty value was submitted (prevents clearing on save)
         new_secret_key = request.POST.get('skroda_secret_key', '').strip()
         new_webhook_secret = request.POST.get('skroda_webhook_secret', '').strip()

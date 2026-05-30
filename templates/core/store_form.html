@@ -163,6 +163,15 @@
           <option value="seller" {% if store_settings.skroda_fee_paid_by == 'seller' %}selected{% endif %}>Seller pays Skroda fee</option>
         </select>
       </div>
+      <div class="form-group">
+        <label class="form-label">Delivery Mode</label>
+        <select name="skroda_delivery_mode" class="form-select">
+          <option value="agent_preferred" {% if store_settings.skroda_delivery_mode == 'agent_preferred' %}selected{% endif %}>Agent preferred — use agent if available, fall back to direct</option>
+          <option value="agent_required" {% if store_settings.skroda_delivery_mode == 'agent_required' %}selected{% endif %}>Agent required — hold transaction if no agent in buyer's city</option>
+          <option value="direct_only" {% if store_settings.skroda_delivery_mode == 'direct_only' %}selected{% endif %}>Direct only — seller ships directly, no agent</option>
+        </select>
+        <div style="font-size:11px;color:var(--text-3);margin-top:3px">Controls how items reach buyers. "Agent preferred" is recommended for most stores.</div>
+      </div>
     </div>
 
     <div class="card">

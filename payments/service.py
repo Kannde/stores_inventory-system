@@ -32,13 +32,15 @@ def _call(method, path, secret_key, body=None):
 
 def create_transaction(secret_key, *, title, amount, currency, seller_phone, seller_name,
                        buyer_phone=None, buyer_name=None, partner_reference=None,
-                       category=None, fee_paid_by='buyer', description=''):
+                       category=None, fee_paid_by='buyer', delivery_mode='agent_preferred',
+                       description=''):
     payload = {
         "title": title,
         "amount": float(amount),
         "currency": currency,
         "seller": {"phone": seller_phone, "name": seller_name},
         "fee_paid_by": fee_paid_by,
+        "delivery_mode": delivery_mode,
     }
     if buyer_phone:
         payload["buyer"] = {"phone": buyer_phone}

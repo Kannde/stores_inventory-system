@@ -17,6 +17,13 @@ class SkrodaTransaction(models.Model):
         ('disputed', 'Disputed'),
         ('cancelled', 'Cancelled'),
         ('refunded', 'Refunded'),
+        ('agent_unavailable', 'Agent Unavailable'),
+    ]
+
+    DELIVERY_MODE_CHOICES = [
+        ('agent_preferred', 'Agent Preferred'),
+        ('agent_required', 'Agent Required'),
+        ('direct_only', 'Direct Only'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -25,6 +32,7 @@ class SkrodaTransaction(models.Model):
     skroda_id = models.CharField(max_length=100, unique=True)
     reference_code = models.CharField(max_length=50, blank=True)
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='draft')
+    delivery_mode = models.CharField(max_length=20, choices=DELIVERY_MODE_CHOICES, default='agent_preferred')
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     checkout_url = models.TextField(blank=True)
     invite_link = models.TextField(blank=True)

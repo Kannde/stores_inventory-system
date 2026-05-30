@@ -71,6 +71,18 @@ def skroda_webhook(request, store_slug):
 
 
 def _handle_event(event_type, data):
+    # transaction.agent_unavailable has a flat payload (transaction_id, not transaction.id)
+    if event_type == 'transaction.agent_unavailable':
+        skroda_id = data.get('transaction_id', '')
+        if skroda_id:
+            try:
+                skroda_txn = SkrodaTransaction.objects.get(skroda_id=skroda_id)
+                skroda_txn.status = 'agent_unavailable'
+                skroda_txn.save(update_fields=['status', 'updated_at'])
+            except SkrodaTransaction.DoesNotExist:
+                pass
+        return
+
     txn_data = data.get('transaction', {})
     skroda_id = txn_data.get('id', '')
     if not skroda_id:
