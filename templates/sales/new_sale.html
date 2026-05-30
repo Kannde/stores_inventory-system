@@ -477,8 +477,28 @@ async function completeSale() {
     const data = await res.json();
     if (data.success) {
       if (data.escrow && data.checkout_url) {
-        // Escrow payment: redirect buyer to Skroda hosted checkout
-        window.location.href = data.checkout_url;
+        closeCheckout();
+        btn.disabled = false; btn.textContent = 'Complete Sale';
+        SkrodaCheckout.open(data.checkout_url, {
+          onSuccess() {
+            document.getElementById('receiptNumber').textContent = data.receipt_number;
+            document.getElementById('receiptTotal').textContent = CURRENCY + parseFloat(data.total).toFixed(2);
+            document.getElementById('receiptChange').style.display = 'none';
+            document.getElementById('receiptLink').href = `/s/${STORE_SLUG}/sales/${data.sale_id}/receipt/`;
+            document.getElementById('receiptModal').classList.add('open');
+          },
+          onPaidContinue() {
+            document.getElementById('receiptNumber').textContent = data.receipt_number;
+            document.getElementById('receiptTotal').textContent = CURRENCY + parseFloat(data.total).toFixed(2);
+            document.getElementById('receiptChange').style.display = 'block';
+            document.getElementById('receiptChange').textContent = 'Payment submitted — waiting for escrow confirmation';
+            document.getElementById('receiptLink').href = `/s/${STORE_SLUG}/sales/${data.sale_id}/receipt/`;
+            document.getElementById('receiptModal').classList.add('open');
+          },
+          onCancel() {
+            showScanToast('Escrow payment cancelled. Cart is intact — try again or choose another method.', true);
+          },
+        });
         return;
       }
       closeCheckout();
@@ -692,5 +712,57 @@ document.getElementById('barcodeInput').focus();
 
 // Initial render
 renderCatalog('');
+
+// ── Skroda Embedded Checkout ──────────────────────────────────
+window.SkrodaCheckout = {
+  _overlay: null,
+  _handler: null,
+
+  open(checkoutUrl, { onSuccess, onPaidContinue, onCancel } = {}) {
+    this.close();
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
+
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'background:#fff;border-radius:16px;overflow:hidden;width:100%;max-width:480px;height:min(92vh,700px);display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.4);position:relative;';
+
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '&times;';
+    closeBtn.title = 'Close';
+    closeBtn.style.cssText = 'position:absolute;top:8px;right:10px;z-index:1;background:rgba(0,0,0,.18);border:none;border-radius:50%;width:28px;height:28px;font-size:18px;line-height:1;cursor:pointer;color:#fff;';
+    closeBtn.onclick = () => { this.close(); onCancel?.(); };
+
+    const iframe = document.createElement('iframe');
+    iframe.src = checkoutUrl;
+    iframe.allow = 'payment';
+    iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;border-radius:16px;';
+
+    wrapper.appendChild(closeBtn);
+    wrapper.appendChild(iframe);
+    overlay.appendChild(wrapper);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) { this.close(); onCancel?.(); } });
+
+    this._handler = (e) => {
+      if (!e.data?.skroda) return;
+      switch (e.data.type) {
+        case 'skroda:checkout:success':
+          this.close(); onSuccess?.(e.data); break;
+        case 'skroda:checkout:paid_continue':
+          this.close(); onPaidContinue?.(e.data); break;
+        case 'skroda:checkout:cancel':
+          this.close(); onCancel?.(e.data); break;
+      }
+    };
+    window.addEventListener('message', this._handler);
+    document.body.appendChild(overlay);
+    this._overlay = overlay;
+  },
+
+  close() {
+    this._overlay?.remove(); this._overlay = null;
+    if (this._handler) { window.removeEventListener('message', this._handler); this._handler = null; }
+  },
+};
 </script>
 {% endblock %}
