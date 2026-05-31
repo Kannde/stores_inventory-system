@@ -104,6 +104,9 @@ def api_checkout(request, store_slug):
     amount_paid = data.get('amount_paid', 0)
     customer_name = data.get('customer_name', '')
     customer_phone = data.get('customer_phone', '')
+    customer_email = data.get('customer_email', '')
+    if payment_method == 'escrow' and not all((customer_name, customer_phone, customer_email)):
+        return JsonResponse({'error': 'Customer name, phone, and email are required for escrow payments.'}, status=400)
 
     store_settings, _ = StoreSettings.objects.get_or_create(store=store)
 
@@ -222,6 +225,7 @@ def api_checkout(request, store_slug):
             seller_name=store.name,
             buyer_phone=customer_phone or None,
             buyer_name=customer_name or None,
+            buyer_email=customer_email or None,
             partner_reference=str(sale.id),
             fee_paid_by=store_settings.skroda_fee_paid_by,
             delivery_mode=store_settings.skroda_delivery_mode,

@@ -173,6 +173,10 @@
         <label class="form-label">Customer Phone *</label>
         <input type="tel" id="customerPhone" class="form-input" placeholder="Phone number" inputmode="tel">
       </div>
+      <div class="form-group">
+        <label class="form-label">Customer Email (required for escrow)</label>
+        <input type="email" id="customerEmail" class="form-input" placeholder="Email address">
+      </div>
     </div>
     <div class="form-group" id="amountPaidGroup">
       <label class="form-label" id="amountPaidLabel">Amount Received</label>
@@ -439,6 +443,8 @@ async function completeSale() {
     const phone = document.getElementById('customerPhone').value.trim();
     if (!name || !phone) { alert('Customer name and phone are required for credit/part/escrow payments.'); return; }
   }
+  const email = document.getElementById('customerEmail').value.trim();
+  if (payMethod === 'escrow' && !email) { alert('Customer email is required for escrow payments.'); return; }
   const btn = document.getElementById('confirmBtn');
   btn.disabled = true; btn.textContent = 'Processing...';
 
@@ -449,6 +455,7 @@ async function completeSale() {
     amount_paid: parseFloat(document.getElementById('amountPaid').value) || 0,
     customer_name: document.getElementById('customerName')?.value.trim() || '',
     customer_phone: document.getElementById('customerPhone')?.value.trim() || '',
+    customer_email: document.getElementById('customerEmail')?.value.trim() || '',
     notes: document.getElementById('saleNotes').value,
   };
 
