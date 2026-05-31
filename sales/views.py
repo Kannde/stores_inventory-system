@@ -196,7 +196,7 @@ def api_checkout(request, store_slug):
             sale.save(update_fields=['status'])
             return JsonResponse({'error': 'Escrow payments are not configured for this store.'}, status=400)
 
-        from payments.service import create_transaction, create_checkout_session
+        from payments.service import create_transaction
         from payments.models import SkrodaTransaction
 
         title = ', '.join(item_names[:3]) + (' & more' if len(item_names) > 3 else '')
@@ -207,6 +207,13 @@ def api_checkout(request, store_slug):
             sale.status = 'refunded'
             sale.save(update_fields=['status'])
             return JsonResponse({'error': 'Skroda seller phone not configured. Set it in Store Settings → Skroda Escrow Payments.'}, status=400)
+
+        success_url = request.build_absolute_uri(
+            f'/s/{store.slug}/payments/skroda/{sale.id}/success/'
+        )
+        cancel_url = request.build_absolute_uri(
+            f'/s/{store.slug}/payments/skroda/{sale.id}/cancelled/'
+        )
 
         ok, txn_data = create_transaction(
             store_settings.skroda_secret_key,
@@ -220,27 +227,19 @@ def api_checkout(request, store_slug):
             partner_reference=str(sale.id),
             fee_paid_by=store_settings.skroda_fee_paid_by,
             delivery_mode=store_settings.skroda_delivery_mode,
+            success_url=success_url,
+            cancel_url=cancel_url,
         )
         if not ok:
             sale.status = 'refunded'
             sale.save(update_fields=['status'])
             return JsonResponse({'error': txn_data.get('error', 'Failed to create escrow transaction.')}, status=502)
 
-        success_url = request.build_absolute_uri(
-            f'/s/{store.slug}/payments/skroda/{sale.id}/success/'
-        )
-        cancel_url = request.build_absolute_uri(
-            f'/s/{store.slug}/payments/skroda/{sale.id}/cancelled/'
-        )
-
-        ok2, session_data = create_checkout_session(
-            store_settings.skroda_secret_key,
-            transaction_id=txn_data['id'],
-            success_url=success_url,
-            cancel_url=cancel_url,
-        )
-
-        checkout_url = session_data.get('checkout_url', txn_data.get('checkout_url', ''))
+        checkout_url = txn_data.get('checkout_url', '')
+        if not checkout_url or not checkout_url.startswith('https://skroda.com/pay/cs_'):
+            sale.status = 'refunded'
+            sale.save(update_fields=['status'])
+            return JsonResponse({'error': 'Invalid checkout URL returned by Skroda.'}, status=502)
 
         SkrodaTransaction.objects.create(
             sale=sale,

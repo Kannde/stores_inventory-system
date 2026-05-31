@@ -716,10 +716,13 @@ renderCatalog('');
 // ── Skroda Embedded Checkout ──────────────────────────────────
 window.SkrodaCheckout = {
   _overlay: null,
+  _iframe: null,
   _handler: null,
 
   open(checkoutUrl, { onSuccess, onPaidContinue, onCancel } = {}) {
     this.close();
+
+    console.log('Skroda iframe URL:', checkoutUrl);
 
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
@@ -743,15 +746,20 @@ window.SkrodaCheckout = {
     overlay.appendChild(wrapper);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) { this.close(); onCancel?.(); } });
 
+    this._iframe = iframe;
     this._handler = (e) => {
-      if (!e.data?.skroda) return;
-      switch (e.data.type) {
-        case 'skroda:checkout:success':
-          this.close(); onSuccess?.(e.data); break;
-        case 'skroda:checkout:paid_continue':
-          this.close(); onPaidContinue?.(e.data); break;
-        case 'skroda:checkout:cancel':
-          this.close(); onCancel?.(e.data); break;
+      // Security: only accept messages from Skroda's origin and this specific iframe
+      if (e.origin !== 'https://skroda.com') return;
+      if (e.source !== this._iframe?.contentWindow) return;
+      const msg = e.data?.skroda;
+      if (!msg) return;
+      switch (msg.event) {
+        case 'funded':
+          this.close(); onSuccess?.(msg); break;
+        case 'paid_continue':
+          this.close(); onPaidContinue?.(msg); break;
+        case 'cancelled':
+          this.close(); onCancel?.(msg); break;
       }
     };
     window.addEventListener('message', this._handler);
@@ -760,7 +768,7 @@ window.SkrodaCheckout = {
   },
 
   close() {
-    this._overlay?.remove(); this._overlay = null;
+    this._overlay?.remove(); this._overlay = null; this._iframe = null;
     if (this._handler) { window.removeEventListener('message', this._handler); this._handler = null; }
   },
 };
