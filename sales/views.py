@@ -208,12 +208,10 @@ def api_checkout(request, store_slug):
             sale.save(update_fields=['status'])
             return JsonResponse({'error': 'Skroda seller phone not configured. Set it in Store Settings → Skroda Escrow Payments.'}, status=400)
 
-        success_url = request.build_absolute_uri(
-            f'/s/{store.slug}/payments/skroda/{sale.id}/success/'
-        )
-        cancel_url = request.build_absolute_uri(
-            f'/s/{store.slug}/payments/skroda/{sale.id}/cancelled/'
-        )
+        # Force HTTPS — Django behind Nginx may otherwise produce http://
+        _host = request.get_host().split(':')[0]
+        success_url = f"https://{_host}/s/{store.slug}/sales/new/"
+        cancel_url = f"https://{_host}/s/{store.slug}/sales/new/"
 
         ok, txn_data = create_transaction(
             store_settings.skroda_secret_key,
